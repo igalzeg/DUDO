@@ -1,1342 +1,1019 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="he">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎲 DUDO 🎲</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Fredoka+One&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>🎲 Dudo</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    <style>
-        :root {
-            --gold: #ffd700;
-            --gold2: #ffaa00;
-            --red: #ff3b3b;
-            --green: #00e676;
-            --blue: #00b8ff;
-            --purple: #c300ff;
-            --felt: #1a5c2a;
-            --felt2: #0e3d1a;
-            --chip-red: #e53935;
-            --chip-blue: #1e88e5;
-            --chip-black: #222;
-        }
+  :root {
+    --gold: #f5c842;
+    --felt: #1a5c2a;
+    --felt-dark: #0d3318;
+    --red: #e84040;
+    --green: #2ecc71;
+    --text: #f0ead6;
+  }
 
-        * { box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: 'Fredoka One', cursive;
+    background: var(--felt-dark);
+    color: var(--text);
+    user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Fredoka One', cursive;
-            background: radial-gradient(ellipse at 60% 30%, #1a5c2a 0%, #0e3d1a 40%, #061a0d 100%);
-            min-height: 100vh;
-            overflow-x: hidden;
-            color: white;
-            user-select: none;
-            touch-action: manipulation;
-        }
+  #root {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-        /* Casino felt texture */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image: repeating-linear-gradient(
-                45deg,
-                rgba(255,255,255,0.015) 0px,
-                rgba(255,255,255,0.015) 1px,
-                transparent 1px,
-                transparent 10px
-            );
-            pointer-events: none;
-            z-index: 0;
-        }
+  /* ── felt table bg ── */
+  .felt-bg {
+    background:
+      radial-gradient(ellipse at 50% 40%, #22723a 0%, #155227 45%, #0b2e18 100%);
+  }
 
-        /* Gold border frame */
-        body::after {
-            content: '';
-            position: fixed;
-            inset: 4px;
-            border: 2px solid rgba(255,215,0,0.2);
-            border-radius: 12px;
-            pointer-events: none;
-            z-index: 0;
-        }
+  /* ── DICE SVG ── */
+  @keyframes fly-to-pile {
+    0%   { transform: translate(0,0) scale(1) rotate(0deg); opacity:1; }
+    60%  { transform: translate(var(--fx), var(--fy)) scale(.7) rotate(420deg); opacity:1; }
+    100% { transform: translate(var(--fx2), var(--fy2)) scale(.35) rotate(600deg); opacity:0; }
+  }
+  @keyframes land-in-pile {
+    0%   { transform: scale(.3) rotate(-30deg); opacity:0; }
+    60%  { transform: scale(1.15) rotate(5deg); opacity:1; }
+    100% { transform: scale(1) rotate(var(--pile-rot,0deg)); opacity:1; }
+  }
+  @keyframes pulse-gold {
+    0%,100% { box-shadow: 0 0 0 0 rgba(245,200,66,.5); }
+    50%      { box-shadow: 0 0 0 8px rgba(245,200,66,0); }
+  }
+  @keyframes pop-in {
+    0%   { transform: scale(.5); opacity:0; }
+    70%  { transform: scale(1.12); }
+    100% { transform: scale(1); opacity:1; }
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%  { transform: translateX(-6px) rotate(-2deg); }
+    40%  { transform: translateX(6px) rotate(2deg); }
+    60%  { transform: translateX(-4px); }
+    80%  { transform: translateX(4px); }
+  }
+  @keyframes flash-red {
+    0%,100% { background: transparent; }
+    30%      { background: rgba(232,64,64,.25); }
+  }
+  @keyframes flash-green {
+    0%,100% { background: transparent; }
+    30%      { background: rgba(46,204,113,.2); }
+  }
+  @keyframes slide-up {
+    from { transform: translateY(100%); opacity:0; }
+    to   { transform: translateY(0); opacity:1; }
+  }
+  @keyframes reveal-in {
+    0%   { transform: scale(.7) translateY(20px); opacity:0; }
+    60%  { transform: scale(1.05) translateY(-4px); }
+    100% { transform: scale(1) translateY(0); opacity:1; }
+  }
+  @keyframes bounce-avatar {
+    0%,100% { transform: translateY(0) scale(1); }
+    30%      { transform: translateY(-18px) scale(1.25); }
+    55%      { transform: translateY(-6px) scale(.95); }
+    75%      { transform: translateY(-3px) scale(1.05); }
+  }
+  @keyframes lose-shake {
+    0%,100% { transform: rotate(0deg); }
+    20%  { transform: rotate(-8deg); }
+    40%  { transform: rotate(8deg); }
+    60%  { transform: rotate(-5deg); }
+    80%  { transform: rotate(5deg); }
+  }
 
-        #root { position: relative; z-index: 1; }
+  /* ── BUTTONS ── */
+  .btn {
+    border: none; cursor: pointer;
+    font-family: 'Fredoka One', cursive;
+    transition: transform .1s, box-shadow .1s;
+    border-radius: 14px;
+  }
+  .btn:active { transform: scale(.95); }
 
-        /* ─── DICE ─── */
-        @keyframes diceRoll {
-            0%   { transform: rotateX(0deg)   rotateY(0deg)   rotateZ(0deg); }
-            25%  { transform: rotateX(180deg) rotateY(90deg)  rotateZ(45deg); }
-            50%  { transform: rotateX(360deg) rotateY(180deg) rotateZ(90deg); }
-            75%  { transform: rotateX(90deg)  rotateY(270deg) rotateZ(135deg); }
-            100% { transform: rotateX(0deg)   rotateY(360deg) rotateZ(180deg); }
-        }
+  .btn-gold {
+    background: linear-gradient(160deg, #f7d060 0%, #e8a820 100%);
+    color: #1a1a00;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  .btn-red {
+    background: linear-gradient(160deg, #ff5555 0%, #c01010 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(200,0,0,.35), inset 0 1px 0 rgba(255,255,255,.2);
+  }
+  .btn-ghost {
+    background: rgba(255,255,255,.08);
+    color: var(--text);
+    border: 2px solid rgba(255,255,255,.18);
+  }
 
-        @keyframes diceLand {
-            0%   { transform: scale(1.4) rotate(-10deg); }
-            40%  { transform: scale(0.9) rotate(3deg); }
-            70%  { transform: scale(1.05) rotate(-2deg); }
-            100% { transform: scale(1) rotate(0deg); }
-        }
+  /* ── INPUTS ── */
+  .casino-input {
+    background: rgba(0,0,0,.35);
+    border: 2px solid rgba(245,200,66,.35);
+    border-radius: 12px;
+    color: white;
+    font-family: 'Fredoka One', cursive;
+    outline: none;
+    text-align: center;
+  }
+  .casino-input:focus { border-color: var(--gold); }
+  .casino-input::placeholder { color: rgba(255,255,255,.3); }
 
-        @keyframes diceFly {
-            0%   { transform: translate(0,0) scale(1) rotate(0deg); opacity: 1; }
-            50%  { transform: translate(var(--tx,80px), var(--ty,-120px)) scale(0.7) rotate(360deg); opacity: 1; }
-            100% { transform: translate(var(--tx2,60px), var(--ty2,60px)) scale(0.4) rotate(540deg); opacity: 0; }
-        }
+  /* ── PLAYER CARD ── */
+  .player-card {
+    background: rgba(0,0,0,.3);
+    border: 2px solid rgba(255,255,255,.1);
+    border-radius: 16px;
+    padding: 10px 12px;
+    text-align: center;
+    transition: border-color .25s, background .25s, transform .2s;
+    cursor: default;
+    flex-shrink: 0;
+  }
+  .player-card.is-turn {
+    border-color: var(--gold);
+    background: rgba(245,200,66,.1);
+    animation: pulse-gold 1.8s infinite;
+    transform: scale(1.07);
+  }
+  .player-card.result-won {
+    border-color: var(--green);
+    background: rgba(46,204,113,.12);
+  }
+  .player-card.result-lost {
+    border-color: var(--red);
+    background: rgba(232,64,64,.12);
+    animation: lose-shake .5s ease;
+  }
 
-        @keyframes bounce-jump {
-            0%   { transform: translateY(0) scale(1); }
-            30%  { transform: translateY(-30px) scale(1.2); }
-            60%  { transform: translateY(-10px) scale(0.95); }
-            80%  { transform: translateY(-5px) scale(1.05); }
-            100% { transform: translateY(0) scale(1); }
-        }
+  /* ── PILE DICE ── */
+  .pile-die {
+    display: inline-block;
+    margin: 2px;
+    transition: transform .3s;
+  }
+  .pile-die.just-added {
+    animation: land-in-pile .45s cubic-bezier(.3,.7,.4,1) both;
+  }
 
-        @keyframes avatarBounce {
-            0%,100% { transform: translate(0,0) scale(1); }
-            20%  { transform: translate(0,-40px) scale(1.3); }
-            40%  { transform: translate(var(--ax,0px), var(--ay,0px)) scale(1.1); }
-            60%  { transform: translate(var(--ax2,0px), var(--ay2,-10px)) scale(1.2); }
-            80%  { transform: translate(0,0) scale(0.9); }
-        }
+  /* ── RESULT OVERLAY ── */
+  .result-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.88);
+    z-index: 100;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start;
+    padding: 16px 14px;
+    gap: 12px;
+    overflow-y: auto;
+    animation: slide-up .25s ease;
+  }
 
-        @keyframes shimmer {
-            0%   { background-position: -200% center; }
-            100% { background-position: 200% center; }
-        }
+  /* ── CONTROLS PANEL ── */
+  .controls-panel {
+    background: linear-gradient(0deg, rgba(5,20,10,.98) 0%, rgba(10,35,18,.95) 100%);
+    border-top: 1.5px solid rgba(245,200,66,.25);
+    padding: 12px 14px 12px;
+    flex-shrink: 0;
+  }
 
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to   { transform: rotate(360deg); }
-        }
-
-        @keyframes cupShake {
-            0%,100% { transform: rotate(0deg) translateY(0); }
-            10%  { transform: rotate(-15deg) translateY(-5px); }
-            20%  { transform: rotate(15deg)  translateY(-8px); }
-            30%  { transform: rotate(-12deg) translateY(-5px); }
-            40%  { transform: rotate(12deg)  translateY(-10px); }
-            50%  { transform: rotate(-10deg) translateY(-7px); }
-            60%  { transform: rotate(10deg)  translateY(-5px); }
-            70%  { transform: rotate(-8deg)  translateY(-3px); }
-            80%  { transform: rotate(8deg)   translateY(-2px); }
-            90%  { transform: rotate(-5deg)  translateY(-1px); }
-        }
-
-        @keyframes floatIn {
-            from { opacity: 0; transform: translateY(30px) scale(0.8); }
-            to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        @keyframes pulse-gold {
-            0%,100% { box-shadow: 0 0 0 0 rgba(255,215,0,0.5); }
-            50%      { box-shadow: 0 0 0 12px rgba(255,215,0,0); }
-        }
-
-        @keyframes spin3d {
-            0%   { transform: rotateY(0deg); }
-            100% { transform: rotateY(360deg); }
-        }
-
-        @keyframes glitter {
-            0%,100% { opacity: 0; transform: scale(0) rotate(0deg); }
-            50%      { opacity: 1; transform: scale(1) rotate(180deg); }
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to   { transform: translateY(0); opacity: 1; }
-        }
-
-        @keyframes screenFlash {
-            0%,100% { background-color: transparent; }
-            20%      { background-color: rgba(255,60,60,0.3); }
-            40%      { background-color: transparent; }
-            60%      { background-color: rgba(255,60,60,0.2); }
-        }
-
-        @keyframes resultReveal {
-            0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
-            60%  { transform: scale(1.1) rotate(2deg); }
-            100% { transform: scale(1) rotate(0deg); opacity: 1; }
-        }
-
-        /* Neon glow text */
-        .neon-gold {
-            color: var(--gold);
-            text-shadow: 0 0 5px #fff, 0 0 10px var(--gold), 0 0 20px var(--gold2), 0 0 40px var(--gold2);
-        }
-        .neon-green {
-            text-shadow: 0 0 5px #fff, 0 0 10px var(--green), 0 0 20px var(--green);
-        }
-        .neon-red {
-            text-shadow: 0 0 5px #fff, 0 0 10px var(--red), 0 0 20px var(--red);
-        }
-
-        /* Dice container */
-        .dice-wrap {
-            display: inline-block;
-            perspective: 300px;
-        }
-        .dice-roll { animation: diceRoll 0.6s linear; }
-        .dice-land { animation: diceLand 0.4s cubic-bezier(.36,.07,.19,.97); }
-
-        /* Cup animation */
-        .cup-rolling { animation: cupShake 0.8s ease-in-out; }
-
-        /* Gold shimmer button */
-        .btn-gold {
-            background: linear-gradient(90deg, #b8860b 0%, #ffd700 30%, #ffaa00 50%, #ffd700 70%, #b8860b 100%);
-            background-size: 200% auto;
-            animation: shimmer 3s linear infinite;
-            color: #000;
-            font-family: 'Fredoka One', cursive;
-            font-weight: 900;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: transform 0.1s, box-shadow 0.1s;
-            box-shadow: 0 4px 15px rgba(255,215,0,0.4);
-        }
-        .btn-gold:active { transform: scale(0.97) translateY(2px); box-shadow: 0 2px 8px rgba(255,215,0,0.3); }
-
-        /* Chip / player card */
-        .player-card {
-            background: rgba(0,0,0,0.4);
-            border: 2px solid rgba(255,215,0,0.25);
-            border-radius: 16px;
-            backdrop-filter: blur(8px);
-            transition: all 0.3s;
-        }
-        .player-card.active {
-            border-color: var(--gold);
-            background: rgba(255,215,0,0.08);
-            animation: pulse-gold 1.5s infinite;
-            transform: scale(1.05);
-        }
-        .player-card.lost-die {
-            border-color: var(--red);
-            background: rgba(255,59,59,0.15);
-        }
-        .player-card.won-call {
-            border-color: var(--green);
-            background: rgba(0,230,118,0.1);
-        }
-
-        /* Cup button */
-        .cup-btn {
-            font-size: 56px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
-            transition: transform 0.15s;
-            line-height: 1;
-            padding: 0;
-        }
-        .cup-btn:active { transform: scale(0.9); }
-
-        /* Controls panel */
-        .controls-panel {
-            background: linear-gradient(180deg, rgba(10,30,15,0.95) 0%, rgba(5,20,10,0.98) 100%);
-            border-top: 2px solid rgba(255,215,0,0.3);
-            border-radius: 24px 24px 0 0;
-            animation: slideUp 0.3s ease;
-        }
-
-        /* Spinning casino coin decoration */
-        .casino-coin {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: conic-gradient(#ffd700, #b8860b, #ffd700, #b8860b);
-            animation: spin 3s linear infinite;
-            display: inline-block;
-        }
-
-        /* Result overlay */
-        .result-overlay {
-            animation: resultReveal 0.5s cubic-bezier(.36,.07,.19,.97) both;
-        }
-
-        /* Floating dice pile */
-        .dice-pile {
-            background: radial-gradient(circle, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.3) 100%);
-            border: 2px dashed rgba(255,215,0,0.3);
-            border-radius: 16px;
-        }
-
-        /* Bet area */
-        .bet-area {
-            background: rgba(0,0,0,0.5);
-            border: 2px solid rgba(255,215,0,0.4);
-            border-radius: 24px;
-            backdrop-filter: blur(10px);
-        }
-
-        /* Input style */
-        .casino-input {
-            background: rgba(0,0,0,0.5);
-            border: 2px solid rgba(255,215,0,0.4);
-            border-radius: 12px;
-            color: white;
-            font-family: 'Fredoka One', cursive;
-            outline: none;
-            text-align: center;
-        }
-        .casino-input:focus { border-color: var(--gold); }
-        .casino-input::placeholder { color: rgba(255,255,255,0.3); }
-
-        /* Small dice indicator */
-        .mini-die {
-            width: 12px;
-            height: 12px;
-            background: var(--gold2);
-            border-radius: 3px;
-            display: inline-block;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-
-        /* Glitter particles */
-        .glitter-particle {
-            position: absolute;
-            width: 6px;
-            height: 6px;
-            pointer-events: none;
-            animation: glitter 0.8s ease-out forwards;
-        }
-
-        /* Name edit inline */
-        .name-edit-input {
-            background: transparent;
-            border: none;
-            border-bottom: 2px solid var(--gold);
-            color: white;
-            font-family: 'Fredoka One', cursive;
-            font-size: 1rem;
-            text-align: center;
-            outline: none;
-            width: 80px;
-        }
-
-        /* Lobby decoration */
-        .lobby-card {
-            background: linear-gradient(135deg, rgba(26,92,42,0.8), rgba(10,40,20,0.9));
-            border: 2px solid rgba(255,215,0,0.3);
-            border-radius: 24px;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
-        }
-
-        /* Screen flash overlay */
-        .screen-flash {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 999;
-            animation: screenFlash 0.5s ease-out;
-        }
-
-        /* Scrollbar hide */
-        ::-webkit-scrollbar { display: none; }
-    </style>
+  /* scrollbar hide */
+  ::-webkit-scrollbar { display: none; }
+</style>
 </head>
-<body>
+<body class="felt-bg">
 <div id="root"></div>
 
 <script>
-// ─────────────────────────────────────────
-// AUDIO ENGINE
-// ─────────────────────────────────────────
-const AudioEngine = (() => {
-    let ctx = null;
-    const getCtx = () => {
-        if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-        if (ctx.state === 'suspended') ctx.resume();
-        return ctx;
-    };
-
-    const osc = (type, freq, gainVal, dur, freqEnd) => {
-        const c = getCtx();
-        const o = c.createOscillator();
-        const g = c.createGain();
-        o.connect(g); g.connect(c.destination);
-        o.type = type;
-        o.frequency.setValueAtTime(freq, c.currentTime);
-        if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, c.currentTime + dur);
-        g.gain.setValueAtTime(gainVal, c.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
-        o.start(c.currentTime); o.stop(c.currentTime + dur);
-    };
-
-    return {
-        click: () => osc('sine', 600, 0.08, 0.08, 300),
-        win:   () => {
-            osc('triangle', 400, 0.1, 0.5, 1200);
-            setTimeout(() => osc('triangle', 600, 0.08, 0.4, 1400), 200);
-            setTimeout(() => osc('triangle', 800, 0.06, 0.3, 1600), 400);
-        },
-        lose:  () => {
-            osc('sawtooth', 200, 0.2, 0.4, 80);
-            setTimeout(() => osc('sawtooth', 100, 0.15, 0.3, 60), 300);
-        },
-        shake: () => {
-            const c = getCtx();
-            const sz = c.sampleRate * 0.3;
-            const buf = c.createBuffer(1, sz, c.sampleRate);
-            const d = buf.getChannelData(0);
-            for (let i = 0; i < sz; i++) d[i] = Math.random() * 2 - 1;
-            const s = c.createBufferSource();
-            s.buffer = buf;
-            const g = c.createGain();
-            g.gain.setValueAtTime(0.12, c.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.3);
-            s.connect(g); g.connect(c.destination);
-            s.start();
-        },
-        reveal: () => {
-            osc('square', 180, 0.15, 0.6, 60);
-            setTimeout(() => osc('sine', 300, 0.1, 0.3, 200), 200);
-        },
-        chipStack: () => osc('triangle', 900, 0.06, 0.1, 400),
-        lobby: () => {
-            [400,500,600,700,800].forEach((f,i) =>
-                setTimeout(() => osc('triangle', f, 0.05, 0.2), i * 100)
-            );
-        }
-    };
+// ═══════════════════════════════════════
+// AUDIO
+// ═══════════════════════════════════════
+const SFX = (() => {
+  let ctx;
+  const C = () => {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  };
+  const tone = (type, freq, vol, dur, freqEnd) => {
+    const c = C(), o = c.createOscillator(), g = c.createGain();
+    o.connect(g); g.connect(c.destination);
+    o.type = type; o.frequency.setValueAtTime(freq, c.currentTime);
+    if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, c.currentTime + dur);
+    g.gain.setValueAtTime(vol, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, c.currentTime + dur);
+    o.start(); o.stop(c.currentTime + dur);
+  };
+  return {
+    click:  () => tone('sine', 600, .07, .08, 300),
+    win:    () => { tone('triangle',400,.1,.5,1200); setTimeout(()=>tone('triangle',700,.07,.4,1400),200); setTimeout(()=>tone('triangle',900,.05,.35,1600),400); },
+    lose:   () => { tone('sawtooth',180,.18,.45,70); setTimeout(()=>tone('sawtooth',100,.12,.3,55),320); },
+    place:  () => tone('triangle', 900, .05, .1, 450),
+    reveal: () => { tone('square',160,.12,.6,55); setTimeout(()=>tone('sine',280,.08,.35,180),250); },
+    shake:  () => {
+      const c = C(), sz = c.sampleRate*.3, buf = c.createBuffer(1,sz,c.sampleRate), d = buf.getChannelData(0);
+      for (let i=0;i<sz;i++) d[i] = Math.random()*2-1;
+      const s = c.createBufferSource(), g = c.createGain();
+      g.gain.setValueAtTime(.1,c.currentTime); g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.3);
+      s.buffer=buf; s.connect(g); g.connect(c.destination); s.start();
+    }
+  };
 })();
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
 // FIREBASE
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
 firebase.initializeApp({
-    apiKey: "AIzaSyCUvDUDrj1MofAFRYeDrGP7OoIz0qX0iW8",
-    authDomain: "dudogame-44b81.firebaseapp.com",
-    databaseURL: "https://dudogame-44b81-default-rtdb.europe-west1.firebasedatabase.app/",
-    projectId: "dudogame-44b81",
-    storageBucket: "dudogame-44b81.firebasestorage.app",
-    messagingSenderId: "681233339238",
-    appId: "1:681233339238:web:c8ed065e83227b6bd22ea7"
+  apiKey: "AIzaSyCUvDUDrj1MofAFRYeDrGP7OoIz0qX0iW8",
+  authDomain: "dudogame-44b81.firebaseapp.com",
+  databaseURL: "https://dudogame-44b81-default-rtdb.europe-west1.firebasedatabase.app/",
+  projectId: "dudogame-44b81",
+  storageBucket: "dudogame-44b81.firebasestorage.app",
+  messagingSenderId: "681233339238",
+  appId: "1:681233339238:web:c8ed065e83227b6bd22ea7"
 });
 const db = firebase.database();
 
 const { useState, useEffect, useRef, useCallback } = React;
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
 // CONSTANTS
-// ─────────────────────────────────────────
-const AVATARS = ['😎','🤠','👽','👻','🤖','🦊','🦁','🦄','🐸','🐵','🐯','🦅','🐲','🎩','💀'];
-const PLAYER_COLORS = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff922b','#cc5de8','#20c997','#f06595'];
+// ═══════════════════════════════════════
+const AVATARS = ['😎','🤠','👽','👻','🤖','🦊','🦁','🦄','🐸','🐵','🐯','🦅','🐲','💀','🎭'];
+const rollDice = n => Array.from({length:n}, () => Math.floor(Math.random()*6)+1);
 
-const rollDice = count => Array.from({length: count}, () => Math.floor(Math.random()*6)+1);
-
-// ─────────────────────────────────────────
-// DICE SVG COMPONENT
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════
+// DICE SVG
+// ═══════════════════════════════════════
 const DOTS = {
-    1: [[50,50]],
-    2: [[28,28],[72,72]],
-    3: [[28,28],[50,50],[72,72]],
-    4: [[28,28],[72,28],[28,72],[72,72]],
-    5: [[28,28],[72,28],[50,50],[28,72],[72,72]],
-    6: [[28,28],[28,50],[28,72],[72,28],[72,50],[72,72]]
+  1:[[50,50]], 2:[[28,28],[72,72]], 3:[[28,28],[50,50],[72,72]],
+  4:[[28,28],[72,28],[28,72],[72,72]], 5:[[28,28],[72,28],[50,50],[28,72],[72,72]],
+  6:[[28,28],[28,50],[28,72],[72,28],[72,50],[72,72]]
+};
+const Dice = ({ val, size=44, bright=false, dim=false, style={} }) => {
+  const isAce = val===1;
+  const face = bright ? '#1a5c2a' : (isAce ? '#7a0a0a' : '#1a1a2e');
+  const border = bright ? '#2ecc71' : (isAce ? '#e84040' : 'rgba(255,255,255,.3)');
+  const glow = bright ? 'drop-shadow(0 0 6px #2ecc71)' : (isAce ? 'drop-shadow(0 0 4px #e84040)' : 'drop-shadow(1px 2px 4px rgba(0,0,0,.7))');
+  return React.createElement('svg', {
+    width:size, height:size, viewBox:'0 0 100 100',
+    style:{ opacity: dim?.6:1, filter:glow, flexShrink:0, ...style }
+  },
+    React.createElement('defs', null,
+      React.createElement('linearGradient', { id:`dg${val}${size}${bright?'b':''}`, x1:'0%', y1:'0%', x2:'100%', y2:'100%' },
+        React.createElement('stop', { offset:'0%', stopColor: bright?'#2e7d45':(isAce?'#900':'#252545') }),
+        React.createElement('stop', { offset:'100%', stopColor: bright?'#0d3318':(isAce?'#500':'#0d0d1a') })
+      )
+    ),
+    React.createElement('rect', { x:5,y:5,width:90,height:90,rx:16,
+      fill:`url(#dg${val}${size}${bright?'b':''})`, stroke:border, strokeWidth: bright?4:2 }),
+    (DOTS[val]||[]).map(([cx,cy],i) =>
+      React.createElement('circle', { key:i, cx, cy, r: isAce?11:7.5,
+        fill: bright ? '#a8ffcc' : (isAce?'#ff5555':'white') })
+    )
+  );
 };
 
-const DiceIcon = ({ value, size=50, highlight=false, dimmed=false, className='' }) => {
-    const isAce = value === 1;
-    const faceColor = isAce ? '#8b0000' : (highlight ? '#1a5c2a' : '#1a1a2e');
-    const borderColor = highlight ? '#00e676' : (isAce ? '#ff6b6b' : 'rgba(255,255,255,0.35)');
-    const shadow = highlight ? 'drop-shadow(0 0 8px #00e676)' : (isAce ? 'drop-shadow(0 0 6px #ff6b6b)' : 'drop-shadow(2px 3px 6px rgba(0,0,0,0.7))');
+// ═══════════════════════════════════════
+// PILE COMPONENT (side pile of lost dice)
+// ═══════════════════════════════════════
+const DicePile = ({ count, justAdded }) => {
+  // Generate stable random rotations seeded by index
+  const rotations = Array.from({length: Math.min(count, 15)}, (_,i) => {
+    const seed = (i * 137 + 29) % 360;
+    return -25 + (seed % 50);
+  });
 
-    return React.createElement('svg', {
-        width: size, height: size, viewBox: '0 0 100 100',
-        className,
-        style: { opacity: dimmed ? 0.25 : 1, filter: shadow, transition: 'all 0.3s', flexShrink: 0 }
-    },
-        React.createElement('defs', null,
-            React.createElement('linearGradient', { id: `dg${value}${size}`, x1:'0%', y1:'0%', x2:'100%', y2:'100%' },
-                React.createElement('stop', { offset:'0%', stopColor: highlight ? '#2d8a4e' : (isAce ? '#a00' : '#252545') }),
-                React.createElement('stop', { offset:'100%', stopColor: highlight ? '#0d3d1e' : (isAce ? '#600' : '#0d0d1a') })
-            )
-        ),
-        React.createElement('rect', { x:5, y:5, width:90, height:90, rx:16, fill:`url(#dg${value}${size})`, stroke: borderColor, strokeWidth: highlight ? 4 : 2 }),
-        (DOTS[value]||[]).map(([cx,cy],i) =>
-            React.createElement('circle', { key:i, cx, cy, r: isAce ? 12 : 8,
-                fill: isAce ? '#ff4444' : (highlight ? '#b8ffcc' : 'white') })
-        )
-    );
-};
-
-// ─────────────────────────────────────────
-// CUP ANIMATION COMPONENT
-// ─────────────────────────────────────────
-const CupWithDice = ({ isRolling, diceCount, onClick, open, dice }) => {
-    return React.createElement('div', { style: { textAlign:'center', position:'relative' } },
-        open && React.createElement('div', {
-            style: {
-                position:'absolute', bottom:'100%', left:'50%',
-                transform:'translateX(-50%)', marginBottom:8,
-                background:'rgba(0,0,0,0.85)', borderRadius:16,
-                border:'2px solid rgba(255,215,0,0.5)',
-                padding:'10px 14px',
-                display:'flex', gap:8, alignItems:'center',
-                animation:'floatIn 0.2s ease',
-                boxShadow:'0 8px 32px rgba(0,0,0,0.7)'
-            }
-        },
-            (dice||[]).map((d,i) => React.createElement(DiceIcon, { key:i, value:d, size:42 }))
-        ),
-        React.createElement('button', {
-            className: `cup-btn ${isRolling ? 'cup-rolling' : ''}`,
-            onClick,
-            style: { position:'relative' }
-        },
-            React.createElement('span', { style:{fontSize:52} }, '🥤'),
-            !open && React.createElement('span', {
-                style: {
-                    position:'absolute', top:-6, right:-8,
-                    background:'linear-gradient(135deg, #ff3b3b, #cc0000)',
-                    color:'white', borderRadius:'50%',
-                    width:22, height:22, display:'flex',
-                    alignItems:'center', justifyContent:'center',
-                    fontSize:12, fontWeight:'bold',
-                    border:'2px solid black',
-                    boxShadow:'0 2px 6px rgba(0,0,0,0.5)'
-                }
-            }, diceCount)
-        )
-    );
-};
-
-// ─────────────────────────────────────────
-// GLITTER PARTICLES
-// ─────────────────────────────────────────
-const Glitters = ({ active, color='#ffd700' }) => {
-    if (!active) return null;
-    const particles = Array.from({length:12}, (_,i) => ({
-        id:i,
-        left: 30 + Math.random()*40,
-        top: 20 + Math.random()*60,
-        delay: Math.random()*0.5,
-        color: [color,'#fff','#ffaa00','#00e676'][Math.floor(Math.random()*4)]
-    }));
-    return React.createElement('div', { style:{position:'absolute', inset:0, pointerEvents:'none', overflow:'hidden'} },
-        particles.map(p => React.createElement('div', {
-            key: p.id,
-            className: 'glitter-particle',
-            style: {
-                left:`${p.left}%`, top:`${p.top}%`,
-                background: p.color,
-                borderRadius: Math.random()>0.5 ? '50%' : '2px',
-                animationDelay: `${p.delay}s`,
-                boxShadow:`0 0 4px ${p.color}`
-            }
-        }))
-    );
-};
-
-// ─────────────────────────────────────────
-// PLAYER CARD (clean: avatar + name + dice dots)
-// ─────────────────────────────────────────
-const PlayerCard = ({ player, isActive, resultState, onEditName, isMe }) => {
-    const [editing, setEditing] = useState(false);
-    const [tempName, setTempName] = useState(player.name);
-    const handleSave = () => {
-        setEditing(false);
-        const n = tempName.trim().substring(0,12);
-        onEditName && onEditName(n || player.name);
-    };
-    const borderColor = isActive ? '#ffd700' : (resultState === 'won' ? '#00e676' : (resultState === 'lost' ? '#ff3b3b' : 'rgba(255,255,255,0.12)'));
-    const bg = isActive ? 'rgba(255,215,0,0.08)' : (resultState === 'won' ? 'rgba(0,230,118,0.08)' : (resultState === 'lost' ? 'rgba(255,59,59,0.08)' : 'rgba(0,0,0,0.35)'));
-    return React.createElement('div', {
-        style:{ border:`2px solid ${borderColor}`, background:bg, borderRadius:14, padding:'8px 10px',
-            textAlign:'center', minWidth:64, maxWidth:80, transition:'all 0.3s',
-            transform: isActive ? 'scale(1.08)' : 'scale(1)',
-            boxShadow: isActive ? '0 0 12px rgba(255,215,0,0.4)' : 'none', position:'relative' }
-    },
-        resultState === 'won' && React.createElement(Glitters, { active:true, color:'#00e676' }),
-        resultState === 'lost' && React.createElement(Glitters, { active:true, color:'#ff3b3b' }),
-        React.createElement('div', { style:{fontSize:28, lineHeight:1, marginBottom:3} }, player.avatar),
-        editing ? React.createElement('input', {
-            style:{ background:'transparent', border:'none', borderBottom:'2px solid #ffd700', color:'white',
-                fontFamily:"'Fredoka One', cursive", fontSize:'0.75rem', textAlign:'center', outline:'none', width:64 },
-            value:tempName, onChange:e=>setTempName(e.target.value.substring(0,12)),
-            onBlur:handleSave,
-            onKeyDown:e=>{ if(e.key==='Enter') handleSave(); if(e.key==='Escape'){ setEditing(false); setTempName(player.name); } },
-            autoFocus:true
-        }) : React.createElement('div', {
-            style:{ fontSize:'0.72rem', color: isMe ? '#ffd700' : 'rgba(255,255,255,0.85)',
-                overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:72, margin:'0 auto',
-                cursor: isMe ? 'pointer' : 'default' },
-            onClick: isMe ? ()=>{ setTempName(player.name); setEditing(true); } : undefined
-        }, player.name, isMe && React.createElement('span', { style:{opacity:0.5, marginLeft:2, fontSize:'0.6rem'} }, '✎')),
-        React.createElement('div', { style:{display:'flex', justifyContent:'center', gap:3, marginTop:5, flexWrap:'wrap', maxWidth:72, margin:'5px auto 0'} },
-            Array.from({length: player.diceCount||0}).map((_,i) =>
-                React.createElement('div', { key:i, style:{width:10, height:10, borderRadius:3, background:'#ffd700', boxShadow:'0 1px 3px rgba(0,0,0,0.5)'} })
-            )
-        )
-    );
-};
-
-
-// ─────────────────────────────────────────
-// DICE PILE (lost dice)
-// ─────────────────────────────────────────
-const DicePile = ({ count }) => {
-    if (count === 0) return null;
-    const pileArr = Array.from({length:Math.min(count,20)}, (_,i) => ({
-        id:i,
-        val: 1 + (i % 6),
-        rotate: -30 + Math.random()*60,
-        x: -20 + Math.random()*40,
-        y: -10 + Math.random()*20
-    }));
-
-    return React.createElement('div', {
-        className:'dice-pile',
-        style:{
-            padding:'8px 12px', display:'flex', flexWrap:'wrap', gap:2, justifyContent:'center',
-            alignItems:'center', position:'relative', minWidth:80, maxWidth:140
-        }
-    },
-        React.createElement('div', { style:{position:'absolute', top:-10, left:'50%', transform:'translateX(-50%)', background:'rgba(0,0,0,0.7)', borderRadius:10, padding:'1px 8px', fontSize:'0.65rem', color:'rgba(255,215,0,0.8)', whiteSpace:'nowrap', border:'1px solid rgba(255,215,0,0.2)'} },
-            `🪦 ×${count}`
-        ),
-        pileArr.slice(0,12).map((d,i) =>
-            React.createElement('div', { key:i, style:{transform:`rotate(${d.rotate}deg)`, display:'inline-block', margin:1} },
-                React.createElement(DiceIcon, { value:d.val, size:18, dimmed:true })
-            )
-        )
-    );
-};
-
-// ─────────────────────────────────────────
-// BID DISPLAY (center)
-// ─────────────────────────────────────────
-const BidDisplay = ({ bid, players }) => {
-    if (!bid) return null;
-    const bidder = players[bid.playerId];
-    return React.createElement('div', {
-        style:{
-            background:'rgba(0,0,0,0.55)', border:'2px solid rgba(255,215,0,0.4)',
-            borderRadius:24, padding:'14px 24px', textAlign:'center',
-            backdropFilter:'blur(10px)', animation:'floatIn 0.3s ease'
-        }
-    },
-        React.createElement('div', { style:{display:'flex', alignItems:'center', justifyContent:'center', gap:16} },
-            React.createElement('span', { style:{fontSize:52, fontWeight:'bold', color:'white', textShadow:'0 0 10px rgba(255,215,0,0.6)'} }, bid.quantity),
-            React.createElement('span', { style:{fontSize:28, color:'rgba(255,255,255,0.4)'} }, '×'),
-            React.createElement(DiceIcon, { value:bid.value, size:56 })
-        ),
-        bidder && React.createElement('div', { style:{marginTop:6, display:'flex', alignItems:'center', justifyContent:'center', gap:6, opacity:0.7, fontSize:'0.8rem'} },
-            React.createElement('span', null, bidder.avatar),
-            React.createElement('span', null, bidder.name)
-        )
-    );
-};
-
-// ─────────────────────────────────────────
-// RESULT SCREEN
-// ─────────────────────────────────────────
-const ResultScreen = ({ gameState, onNextRound, isHost, myId }) => {
-    const la = gameState.lastAction;
-    if (!la) return null;
-
-    const callerWon = la.success;
-    const loser = gameState.players[la.loserId];
-    const caller = gameState.players[la.caller];
-    const bidder = gameState.players[la.bidder];
-    const isCallerMe = la.caller === myId;
-
-    // Collect all dice for display
-    const allPlayerDice = Object.entries(gameState.players).map(([pid, p]) => ({
-        pid, player: p, dice: p.dice || []
-    })).filter(x => x.dice.length > 0);
-
-    const bidValue = la.bidWas?.value;
-
-    return React.createElement('div', {
-        style:{
-            position:'fixed', inset:0, zIndex:200,
-            background:'rgba(0,0,0,0.92)',
-            display:'flex', flexDirection:'column',
-            alignItems:'center', justifyContent:'flex-start',
-            padding:'20px 16px', overflowY:'auto', gap:12
-        }
-    },
-        // Result badge
-        React.createElement('div', {
-            className:'result-overlay',
-            style:{
-                background: callerWon
-                    ? 'linear-gradient(135deg, #0d3d1e, #1a5c2a)'
-                    : 'linear-gradient(135deg, #3d0d0d, #6b1515)',
-                border: `3px solid ${callerWon ? '#00e676' : '#ff3b3b'}`,
-                borderRadius:24, padding:'16px 28px', textAlign:'center', width:'100%', maxWidth:380,
-                boxShadow: `0 0 30px ${callerWon ? 'rgba(0,230,118,0.4)' : 'rgba(255,59,59,0.4)'}`,
-                position:'relative'
-            }
-        },
-            callerWon && React.createElement(Glitters, { active:true, color:'#00e676' }),
-            !callerWon && React.createElement(Glitters, { active:true, color:'#ff3b3b' }),
-            // Avatars animation
-            React.createElement('div', {
-                style:{display:'flex', alignItems:'center', justifyContent:'center', gap:16, marginBottom:12}
-            },
-                React.createElement('div', { style:{fontSize:40, animation: callerWon ? 'bounce-jump 0.8s ease' : 'none'} }, caller?.avatar || '❓'),
-                React.createElement('span', { style:{fontSize:22, color: callerWon ? '#00e676' : '#ff3b3b'} }, callerWon ? '👊' : '😬'),
-                React.createElement('div', { style:{fontSize:40, animation: !callerWon ? 'bounce-jump 0.8s ease' : 'none'} }, bidder?.avatar || '❓')
-            ),
-            React.createElement('div', {
-                style:{ fontSize:'1.2rem', color: callerWon ? '#00e676' : '#ff3b3b', marginBottom:6,
-                    textShadow: `0 0 10px ${callerWon ? '#00e676' : '#ff3b3b'}`}
-            }, callerWon ? (isCallerMe ? '✅🎉✅' : '✅') : (isCallerMe ? '❌💀❌' : '❌')),
-            React.createElement('div', {
-                style:{display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:8}
-            },
-                React.createElement('span', { style:{fontSize:'2rem', fontWeight:'bold', color:'white'} }, la.actualCount),
-                React.createElement('span', { style:{color:'rgba(255,255,255,0.5)', fontSize:'1.1rem'} }, '×'),
-                React.createElement(DiceIcon, { value: bidValue||1, size:38 }),
-                React.createElement('span', { style:{color:'rgba(255,255,255,0.6)', fontSize:'0.85rem'} }, '(+🎲1)')
-            ),
-            React.createElement('div', { style:{color:'rgba(255,255,255,0.5)', fontSize:'0.75rem', marginBottom:4} },
-                la.bidWas?.quantity, '×', React.createElement(DiceIcon, { value:bidValue||1, size:16 })
-            ),
-            React.createElement('div', { style:{color: callerWon ? '#00e676' : '#ff3b3b', fontSize:'0.85rem', fontWeight:'bold'} },
-                loser?.avatar, ' ', loser?.name, ' -1 🎲'
-            )
-        ),
-
-        // All dice revealed
-        React.createElement('div', { style:{width:'100%', maxWidth:380} },
-            React.createElement('div', { style:{fontSize:'0.7rem', color:'rgba(255,215,0,0.6)', textAlign:'center', marginBottom:8, letterSpacing:2} }, '🎲🎲🎲'),
-            allPlayerDice.map(({pid, player, dice}) =>
-                React.createElement('div', { key:pid, style:{display:'flex', alignItems:'center', gap:8, marginBottom:8, background:'rgba(255,255,255,0.05)', borderRadius:12, padding:'6px 10px'} },
-                    React.createElement('span', { style:{fontSize:22} }, player.avatar),
-                    React.createElement('div', { style:{display:'flex', gap:4, flexWrap:'wrap'} },
-                        dice.map((d,i) => {
-                            const isMatch = d === bidValue || (bidValue !== 1 && d === 1);
-                            return React.createElement(DiceIcon, { key:i, value:d, size:32, highlight:isMatch, dimmed:!isMatch });
-                        })
-                    )
-                )
-            )
-        ),
-
-        // Next round button
-        React.createElement('button', {
-            className:'btn-gold',
-            style:{padding:'14px 40px', fontSize:'1.2rem', marginTop:4},
-            onClick: onNextRound
-        }, '▶️')
-    );
-};
-
-// ─────────────────────────────────────────
-// MAIN APP
-// ─────────────────────────────────────────
-const App = () => {
-    const [player, setPlayer] = useState(() => {
-        const s = JSON.parse(sessionStorage.getItem('dudo_player') || '{}');
-        return {
-            id: s.id || Math.random().toString(36).substring(2,9),
-            name: s.name || ('P'+Math.floor(Math.random()*99)),
-            avatar: s.avatar || AVATARS[Math.floor(Math.random()*AVATARS.length)],
-            color: s.color || PLAYER_COLORS[Math.floor(Math.random()*PLAYER_COLORS.length)]
-        };
-    });
-
-    const [gameState, setGameState] = useState(null);
-    const [roomId, setRoomId] = useState('');
-    const [roomInput, setRoomInput] = useState('');
-    const [localBid, setLocalBid] = useState({ quantity:1, value:2 });
-    const [flashScreen, setFlashScreen] = useState(false);
-    const [notification, setNotification] = useState(null);
-    const [editingName, setEditingName] = useState(false);
-    const [tempName, setTempName] = useState(player.name);
-    const [showResult, setShowResult] = useState(false);
-    const [resultAck, setResultAck] = useState(false);
-    const [copiedLink, setCopiedLink] = useState(false);
-
-    const prevPhaseRef = useRef(null);
-
-    // Save player
-    useEffect(() => {
-        sessionStorage.setItem('dudo_player', JSON.stringify(player));
-        // Sync name to Firebase if in game
-        if (roomId && gameState?.players?.[player.id]) {
-            db.ref(`rooms/${roomId}/players/${player.id}/name`).set(player.name);
-            db.ref(`rooms/${roomId}/players/${player.id}/avatar`).set(player.avatar);
-        }
-    }, [player]);
-
-    // Auto-join from URL - must run once on mount, pass code directly
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get('room');
-        if (code && code.length === 4) {
-            setRoomInput(code);
-            // Call Firebase directly here to avoid stale closure issues
-            db.ref(`rooms/${code}`).transaction(room => {
-                if (!room) return;
-                const pid = player.id;
-                if (!room.players[pid]) {
-                    const existing = Object.values(room.players);
-                    const minDice = room.phase === 'PLAYING' ? Math.min(...existing.map(p=>p.diceCount)) : 5;
-                    room.players[pid] = {...player, diceCount:minDice, dice:[]};
-                    room.playerSequence = room.playerSequence || [];
-                    if (!room.playerSequence.includes(pid)) room.playerSequence.push(pid);
-                }
-                return room;
-            }, (err, committed, snap) => {
-                if (snap && snap.val()) {
-                    setRoomId(code);
-                    setGameState(snap.val());
-                    AudioEngine.click();
-                }
-            });
-        }
-    }, []);
-
-    // Game state listener
-    useEffect(() => {
-        if (!roomId) return;
-        const ref = db.ref(`rooms/${roomId}`);
-        const handler = snap => {
-            const val = snap.val();
-            if (!val) return;
-
-            const prev = prevPhaseRef.current;
-
-            // Phase transitions
-            if (val.phase === 'REVEALED' && prev !== 'REVEALED') {
-                AudioEngine.reveal();
-                setFlashScreen(true);
-                setTimeout(()=>setFlashScreen(false), 600);
-                setShowResult(true);
-                setResultAck(false);
-            }
-
-            if (val.phase === 'PLAYING' && prev === 'REVEALED') {
-                setShowResult(false);
-                setResultAck(false);
-                AudioEngine.shake();
-            }
-
-            if (val.phase === 'WON' && prev !== 'WON') {
-                AudioEngine.win();
-                confetti({ particleCount:200, spread:80, origin:{y:0.5}, colors:['#ffd700','#00e676','#ff6b6b'] });
-                setTimeout(()=>confetti({ particleCount:100, spread:120, origin:{x:0.1, y:0.3} }), 500);
-                setTimeout(()=>confetti({ particleCount:100, spread:120, origin:{x:0.9, y:0.3} }), 700);
-            }
-
-            if (val.phase === 'PLAYING' && prev !== 'PLAYING' && prev !== null) {
-                // New bid defaults
-                setLocalBid({ quantity:1, value:2 });
-            } else if (val.currentBid && val.phase === 'PLAYING') {
-                setLocalBid(val.currentBid);
-            }
-
-            prevPhaseRef.current = val.phase;
-            setGameState(val);
-        };
-        ref.on('value', handler);
-        return () => ref.off('value', handler);
-    }, [roomId]);
-
-    // ─── Room functions ───
-    const doCreate = () => {
-        const code = Math.floor(1000+Math.random()*9000).toString();
-        const init = {
-            roomId: code,
-            hostId: player.id,
-            phase: 'LOBBY',
-            turnIndex: 0,
-            playerSequence: [player.id],
-            tableDiceCount: 0,
-            players: { [player.id]: {...player, diceCount:5, dice:[]} }
-        };
-        db.ref(`rooms/${code}`).set(init);
-        setRoomId(code);
-        setGameState(init);
-        AudioEngine.lobby();
-        // Update URL
-        window.history.pushState({}, '', `?room=${code}`);
-    };
-
-    const doJoin = (code) => {
-        const c = (code || roomInput || '').toString().trim();
-        if (!c || c.length !== 4) return;
-        db.ref(`rooms/${c}`).transaction(room => {
-            if (!room) return room; // abort if room doesn't exist
-            if (!room.players[player.id]) {
-                const existing = Object.values(room.players);
-                const minDice = room.phase === 'PLAYING' ? Math.min(...existing.map(p=>p.diceCount)) : 5;
-                room.players[player.id] = {...player, diceCount:minDice, dice:[]};
-                room.playerSequence = room.playerSequence || [];
-                if (!room.playerSequence.includes(player.id)) room.playerSequence.push(player.id);
-            }
-            return room;
-        }, (err, committed, snap) => {
-            const val = snap && snap.val();
-            if (val) {
-                setRoomId(c);
-                setGameState(val);
-                AudioEngine.click();
-                window.history.pushState({}, '', `?room=${c}`);
-            } else {
-                setNotification('❌');
-                setTimeout(()=>setNotification(null), 2000);
-            }
-        });
-    };
-
-    const doShare = () => {
-        const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-        navigator.clipboard.writeText(url).catch(()=>{});
-        setCopiedLink(true);
-        setTimeout(()=>setCopiedLink(false), 2500);
-        AudioEngine.click();
-    };
-
-    const doStartGame = () => {
-        const newPlayers = {...gameState.players};
-        Object.keys(newPlayers).forEach(pid => {
-            newPlayers[pid].dice = rollDice(newPlayers[pid].diceCount);
-        });
-        db.ref(`rooms/${roomId}`).update({
-            phase:'PLAYING', players:newPlayers, currentBid:null, turnIndex:0, lastAction:null
-        });
-        AudioEngine.shake();
-    };
-
-    const doNextRound = () => {
-        if (!gameState) return;
-        const la = gameState.lastAction;
-        const newPlayers = {...gameState.players};
-        const playersLeft = gameState.playerSequence.filter(pid => (newPlayers[pid]?.diceCount||0) > 0);
-
-        if (playersLeft.length === 1) {
-            db.ref(`rooms/${roomId}`).update({ phase:'WON', winnerId:playersLeft[0] });
-            return;
-        }
-
-        // Count lost dice for pile
-        const lostDice = (gameState.tableDiceCount||0) + 1;
-
-        // Reroll remaining
-        playersLeft.forEach(pid => {
-            newPlayers[pid].dice = rollDice(newPlayers[pid].diceCount);
-        });
-
-        db.ref(`rooms/${roomId}`).update({
-            phase:'PLAYING',
-            players:newPlayers,
-            playerSequence:playersLeft,
-            turnIndex:0,
-            currentBid:null,
-            lastAction:null,
-            tableDiceCount: lostDice
-        });
-    };
-
-    const doPlaceBid = () => {
-        const cur = gameState.currentBid;
-        if (cur) {
-            const ok = localBid.quantity > cur.quantity || (localBid.quantity === cur.quantity && localBid.value > cur.value);
-            if (!ok) {
-                AudioEngine.lose();
-                setNotification('⬆️');
-                setTimeout(()=>setNotification(null), 1800);
-                return;
-            }
-        }
-        const next = (gameState.turnIndex + 1) % gameState.playerSequence.length;
-        db.ref(`rooms/${roomId}`).update({
-            currentBid: {...localBid, playerId:player.id},
-            turnIndex: next,
-            lastAction: {type:'BID', playerId:player.id, bid:localBid}
-        });
-        AudioEngine.chipStack();
-    };
-
-    const doCallDudo = () => {
-        const bid = gameState.currentBid;
-        const allDice = Object.values(gameState.players).flatMap(p=>p.dice||[]);
-        const count = allDice.filter(d => d===bid.value || (bid.value!==1 && d===1)).length;
-        const callerWon = count < bid.quantity;
-        const loserId = callerWon ? bid.playerId : player.id;
-
-        const newPlayers = {...gameState.players};
-        newPlayers[loserId] = {...newPlayers[loserId], diceCount: Math.max(0, newPlayers[loserId].diceCount-1)};
-
-        db.ref(`rooms/${roomId}`).update({
-            phase:'REVEALED',
-            players:newPlayers,
-            lastAction:{
-                type:'DUDO', caller:player.id, bidder:bid.playerId,
-                success:callerWon, loserId,
-                actualCount:count, bidWas:bid
-            }
-        });
-        callerWon ? AudioEngine.win() : AudioEngine.lose();
-    };
-
-    const updateMyName = (name) => {
-        const n = name.substring(0,12)||player.name;
-        setPlayer(p => ({...p, name:n}));
-    };
-
-    // ─── Derived state ───
-    const me = gameState?.players?.[player.id];
-    const isMyTurn = gameState?.phase==='PLAYING' && gameState.playerSequence[gameState.turnIndex]===player.id;
-    const totalDiceInGame = gameState ? Object.values(gameState.players).reduce((s,p)=>s+(p.diceCount||0),0) : 0;
-
-    // ─── Lobby result state per player ───
-    const getResultState = (pid) => {
-        if (!gameState?.lastAction || gameState.phase !== 'REVEALED') return null;
-        const la = gameState.lastAction;
-        if (pid === la.loserId) return 'lost';
-        if (pid === la.caller && la.success) return 'won';
-        return null;
-    };
-
-    // ─────────────────────────────────────
-    // LOBBY SCREEN
-    // ─────────────────────────────────────
-    if (!gameState) {
-        return React.createElement('div', {
-            style:{
-                minHeight:'100vh', display:'flex', flexDirection:'column',
-                alignItems:'center', justifyContent:'center', padding:'24px 20px',
-                gap:20
-            }
-        },
-            // Title
-            React.createElement('div', { style:{textAlign:'center', marginBottom:8} },
-                React.createElement('div', { style:{fontSize:'4rem', lineHeight:1} }, '🎲'),
-                React.createElement('h1', {
-                    className:'neon-gold',
-                    style:{fontFamily:"'Boogaloo', cursive", fontSize:'3.5rem', margin:0, letterSpacing:4}
-                }, 'DUDO'),
-                React.createElement('div', { style:{color:'rgba(255,215,0,0.6)', letterSpacing:8, fontSize:'0.8rem', marginTop:4} }, '◆◇◆◇◆')
-            ),
-
-            // Profile card
-            React.createElement('div', {
-                className:'lobby-card',
-                style:{padding:'16px 20px', display:'flex', alignItems:'center', gap:14, width:'100%', maxWidth:320}
-            },
-                // Avatar selector
-                React.createElement('div', {
-                    style:{fontSize:42, cursor:'pointer', lineHeight:1, filter:'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'},
-                    onClick:()=>{
-                        const i = AVATARS.indexOf(player.avatar);
-                        setPlayer(p=>({...p, avatar:AVATARS[(i+1)%AVATARS.length]}));
-                    }
-                }, player.avatar),
-                React.createElement('div', { style:{flex:1} },
-                    editingName
-                        ? React.createElement('div', { style:{display:'flex', gap:6} },
-                            React.createElement('input', {
-                                className:'casino-input',
-                                value:tempName,
-                                onChange:e=>setTempName(e.target.value.substring(0,12)),
-                                onBlur:()=>{ updateMyName(tempName); setEditingName(false); },
-                                onKeyDown:e=>{ if(e.key==='Enter'||e.key==='Escape'){ updateMyName(tempName); setEditingName(false); } },
-                                autoFocus:true, style:{width:'100%', padding:'6px 8px', fontSize:'1.1rem'}
-                            })
-                        )
-                        : React.createElement('div', {
-                            style:{display:'flex', alignItems:'center', gap:6, cursor:'pointer'},
-                            onClick:()=>{ setTempName(player.name); setEditingName(true); }
-                          },
-                            React.createElement('span', { style:{fontSize:'1.3rem', color:'white', fontWeight:'bold'} }, player.name),
-                            React.createElement('span', { style:{opacity:0.5, fontSize:'0.8rem'} }, '✎')
-                          ),
-                    React.createElement('div', { style:{fontSize:'0.65rem', color:'rgba(255,215,0,0.5)', marginTop:2} }, '👆 ' )
-                )
-            ),
-
-            // Buttons
-            React.createElement('button', {
-                className:'btn-gold',
-                style:{padding:'15px 50px', fontSize:'1.25rem', width:'100%', maxWidth:320},
-                onClick:doCreate
-            }, '🎰'),
-
-            React.createElement('div', { style:{display:'flex', gap:8, width:'100%', maxWidth:320} },
-                React.createElement('input', {
-                    className:'casino-input',
-                    value:roomInput,
-                    onChange:e=>setRoomInput(e.target.value.substring(0,4).toUpperCase()),
-                    placeholder:'####',
-                    style:{flex:1, padding:'12px 10px', fontSize:'1.2rem', letterSpacing:6}
-                }),
-                React.createElement('button', {
-                    style:{padding:'12px 20px', borderRadius:12, background:'rgba(0,200,100,0.3)', border:'2px solid rgba(0,200,100,0.5)', color:'white', cursor:'pointer', fontSize:'1.1rem'},
-                    onClick:()=>doJoin()
-                }, '▶')
-            ),
-
-            notification && React.createElement('div', {
-                style:{
-                    position:'fixed', top:20, left:'50%', transform:'translateX(-50%)',
-                    background:'rgba(255,60,60,0.85)', borderRadius:20, padding:'8px 20px',
-                    fontSize:'1.1rem', zIndex:999
-                }
-            }, notification)
-        );
+  return React.createElement('div', {
+    style:{
+      display:'flex', flexWrap:'wrap', justifyContent:'center', alignItems:'center',
+      gap:2, padding:8,
+      background:'rgba(0,0,0,.35)',
+      border:'1.5px solid rgba(255,255,255,.1)',
+      borderRadius:14, minWidth:56, minHeight:56
     }
+  },
+    rotations.map((rot,i) =>
+      React.createElement('div', {
+        key:i,
+        className: `pile-die ${i === count-1 && justAdded ? 'just-added' : ''}`,
+        style:{ transform:`rotate(${rot}deg)`, '--pile-rot':`${rot}deg` }
+      },
+        React.createElement(Dice, { val:1+(i%6), size:20, dim:true })
+      )
+    )
+  );
+};
 
-    // ─────────────────────────────────────
-    // GAME SCREEN
-    // ─────────────────────────────────────
-    const opponents = gameState.playerSequence.filter(pid=>pid!==player.id);
-    const activePlayerId = gameState.playerSequence[gameState.turnIndex];
+// ═══════════════════════════════════════
+// PLAYER CARD
+// ═══════════════════════════════════════
+const PlayerCard = ({ p, isActive, resultState, isMe, onEditAvatar, onEditName }) => {
+  const [editingName, setEditingName] = useState(false);
+  const [tmpName, setTmpName] = useState(p.name);
 
-    return React.createElement('div', {
-        style:{
-            height:'100vh', display:'flex', flexDirection:'column',
-            overflow:'hidden', position:'relative'
-        }
+  const saveName = () => {
+    setEditingName(false);
+    const n = tmpName.trim().substring(0,12);
+    if (n) onEditName && onEditName(n);
+    else setTmpName(p.name);
+  };
+
+  const cls = `player-card${isActive?' is-turn':''}${resultState==='won'?' result-won':''}${resultState==='lost'?' result-lost':''}`;
+
+  return React.createElement('div', { className: cls, style:{ minWidth:64, maxWidth:76 } },
+    // Avatar — clickable if mine
+    React.createElement('div', {
+      style:{ fontSize:30, lineHeight:1, cursor: isMe?'pointer':'default',
+        transition:'transform .15s' },
+      onClick: isMe ? onEditAvatar : undefined,
+      title: isMe ? '👆' : ''
+    }, p.avatar),
+
+    // Name — editable if mine
+    editingName
+      ? React.createElement('input', {
+          autoFocus:true,
+          value:tmpName,
+          onChange:e=>setTmpName(e.target.value.substring(0,12)),
+          onBlur:saveName,
+          onKeyDown:e=>{ if(e.key==='Enter') saveName(); if(e.key==='Escape'){ setEditingName(false); setTmpName(p.name); } },
+          style:{ background:'transparent', border:'none', borderBottom:'2px solid #f5c842',
+            color:'white', fontFamily:"'Fredoka One', cursive", fontSize:'.72rem',
+            textAlign:'center', outline:'none', width:64, marginTop:3 }
+        })
+      : React.createElement('div', {
+          style:{ fontSize:'.72rem', marginTop:3, overflow:'hidden',
+            textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:70, margin:'3px auto 0',
+            color: isMe ? '#f5c842' : 'rgba(255,255,255,.85)',
+            cursor: isMe ? 'pointer' : 'default' },
+          onClick: isMe ? ()=>{ setTmpName(p.name); setEditingName(true); } : undefined
+        }, p.name)
+  );
+};
+
+// ═══════════════════════════════════════
+// CURRENT BID CENTER DISPLAY
+// ═══════════════════════════════════════
+const BidCenter = ({ bid, players }) => {
+  if (!bid) return React.createElement('div', {
+    style:{ fontSize:'.9rem', color:'rgba(255,255,255,.3)', letterSpacing:3, textAlign:'center' }
+  }, '· · ·');
+
+  const bidder = players?.[bid.playerId];
+  return React.createElement('div', {
+    style:{
+      display:'flex', flexDirection:'column', alignItems:'center', gap:6,
+      background:'rgba(0,0,0,.4)', border:'2px solid rgba(245,200,66,.3)',
+      borderRadius:20, padding:'12px 24px',
+      animation:'pop-in .3s ease'
+    }
+  },
+    React.createElement('div', {
+      style:{ display:'flex', alignItems:'center', gap:12 }
     },
-        // Screen flash
-        flashScreen && React.createElement('div', { className:'screen-flash', style:{zIndex:500} }),
+      React.createElement('span', {
+        style:{ fontSize:'2.8rem', fontWeight:'bold', color:'white',
+          textShadow:'0 0 8px rgba(245,200,66,.5)' }
+      }, bid.quantity),
+      React.createElement('span', { style:{ fontSize:'1.4rem', opacity:.4 } }, '×'),
+      React.createElement(Dice, { val:bid.value, size:52 })
+    ),
+    bidder && React.createElement('div', {
+      style:{ fontSize:'.75rem', color:'rgba(255,255,255,.5)',
+        display:'flex', alignItems:'center', gap:4 }
+    }, bidder.avatar, ' ', bidder.name)
+  );
+};
 
-        // ── RESULT SCREEN OVERLAY ──
-        showResult && gameState.phase === 'REVEALED' && gameState.lastAction &&
-        React.createElement(ResultScreen, {
-            gameState,
-            onNextRound: doNextRound,
-            isHost: gameState.hostId === player.id,
-            myId: player.id
+// ═══════════════════════════════════════
+// RESULT SCREEN
+// ═══════════════════════════════════════
+const ResultScreen = ({ gs, myId, onNext, pileRef }) => {
+  const la = gs.lastAction;
+  if (!la) return null;
+
+  const [flyingDie, setFlyingDie] = useState(false);
+
+  useEffect(() => {
+    // Trigger flying-die animation shortly after mount
+    setTimeout(() => setFlyingDie(true), 600);
+  }, []);
+
+  const callerWon = la.success;
+  const caller  = gs.players[la.caller];
+  const bidder  = gs.players[la.bidder];
+  const loser   = gs.players[la.loserId];
+  const bidVal  = la.bidWas?.value;
+  const isMe    = myId === la.caller;
+  const iLost   = myId === la.loserId;
+
+  const allPlayerDice = gs.playerSequence.map(pid => ({
+    pid, p: gs.players[pid], dice: gs.players[pid]?.dice || []
+  })).filter(x => x.dice.length > 0);
+
+  return React.createElement('div', { className:'result-overlay' },
+
+    // ── TOP: WHO LOST ──
+    React.createElement('div', {
+      style:{
+        width:'100%', maxWidth:360, borderRadius:20,
+        border:`3px solid ${callerWon ? '#2ecc71' : '#e84040'}`,
+        background: callerWon ? 'rgba(20,80,40,.9)' : 'rgba(80,10,10,.9)',
+        padding:'14px 18px', textAlign:'center',
+        boxShadow:`0 0 24px ${callerWon?'rgba(46,204,113,.4)':'rgba(232,64,64,.4)'}`,
+        animation:'reveal-in .4s cubic-bezier(.3,.7,.4,1) both',
+        position:'relative', overflow:'hidden'
+      }
+    },
+      // Caller & Bidder avatars
+      React.createElement('div', {
+        style:{ display:'flex', alignItems:'center', justifyContent:'center', gap:14, marginBottom:10 }
+      },
+        React.createElement('div', {
+          style:{ fontSize:36, animation: callerWon ? 'bounce-avatar .7s ease' : 'lose-shake .5s ease' }
+        }, caller?.avatar),
+        React.createElement('span', { style:{ fontSize:20, opacity:.6 } }, callerWon ? '✋' : '😬'),
+        React.createElement('div', {
+          style:{ fontSize:36, animation: !callerWon ? 'bounce-avatar .7s ease' : 'lose-shake .5s ease' }
+        }, bidder?.avatar)
+      ),
+
+      // Result indicator
+      React.createElement('div', {
+        style:{
+          fontSize:'1.8rem', marginBottom:8,
+          animation:`${callerWon?'flash-green':'flash-red'} .6s ease`
+        }
+      }, callerWon ? (isMe ? '🎉' : '✅') : (iLost ? '💀' : '❌')),
+
+      // Actual count vs bid
+      React.createElement('div', {
+        style:{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:6 }
+      },
+        React.createElement('span', {
+          style:{ fontSize:'2rem', fontWeight:'bold',
+            color: la.actualCount >= la.bidWas?.quantity ? '#2ecc71' : '#e84040' }
+        }, la.actualCount),
+        React.createElement('span', { style:{ opacity:.4, fontSize:'1.2rem' } }, '×'),
+        React.createElement(Dice, { val:bidVal||2, size:36 }),
+        React.createElement('span', { style:{ opacity:.4, fontSize:'1rem' } }, '/ '+la.bidWas?.quantity)
+      ),
+
+      // Loser
+      React.createElement('div', {
+        style:{ fontSize:'.85rem', color: '#e84040', marginTop:4,
+          display:'flex', alignItems:'center', justifyContent:'center', gap:6 }
+      }, loser?.avatar, ' ', loser?.name, ' −1 🎲')
+    ),
+
+    // ── ALL DICE REVEALED ──
+    React.createElement('div', { style:{ width:'100%', maxWidth:360 } },
+      allPlayerDice.map(({pid, p, dice}) =>
+        React.createElement('div', {
+          key:pid,
+          style:{
+            display:'flex', alignItems:'center', gap:8, marginBottom:8,
+            background:'rgba(255,255,255,.05)', borderRadius:12, padding:'7px 10px'
+          }
+        },
+          React.createElement('span', { style:{fontSize:22, flexShrink:0} }, p.avatar),
+          React.createElement('div', { style:{display:'flex', gap:4, flexWrap:'wrap', alignItems:'center'} },
+            dice.map((d,i) => {
+              const match = d===bidVal || (bidVal!==1 && d===1);
+              return React.createElement(Dice, { key:i, val:d, size:34, bright:match, dim:!match });
+            })
+          ),
+          // Show if this player lost a die
+          pid === la.loserId && React.createElement('span', {
+            style:{ fontSize:16, color:'#e84040', flexShrink:0, marginLeft:'auto' }
+          }, '−1')
+        )
+      )
+    ),
+
+    // ── NEXT ROUND BUTTON ──
+    React.createElement('button', {
+      className:'btn btn-gold',
+      style:{ width:'100%', maxWidth:360, padding:'15px 0', fontSize:'1.3rem' },
+      onClick: onNext
+    }, '▶')
+  );
+};
+
+// ═══════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════
+const App = () => {
+  // ── State ──
+  const [player, setPlayer] = useState(() => {
+    const s = JSON.parse(sessionStorage.getItem('dudo_p') || '{}');
+    return {
+      id:     s.id     || Math.random().toString(36).substring(2,9),
+      name:   s.name   || 'Player',
+      avatar: s.avatar || AVATARS[Math.floor(Math.random()*AVATARS.length)]
+    };
+  });
+  const [gs, setGs]             = useState(null);
+  const [roomId, setRoomId]     = useState('');
+  const [roomInput, setRoomInput] = useState('');
+  const [bid, setBid]           = useState({ qty:1, val:2 });
+  const [showResult, setShowResult] = useState(false);
+  const [copied, setCopied]     = useState(false);
+  const [pileJustAdded, setPileJustAdded] = useState(false);
+  const [notification, setNotification] = useState(null);
+  const [flashClass, setFlashClass] = useState('');
+
+  const prevPhase = useRef(null);
+  const prevPile  = useRef(0);
+
+  // ── Persist player ──
+  useEffect(() => {
+    sessionStorage.setItem('dudo_p', JSON.stringify(player));
+    if (roomId) {
+      db.ref(`rooms/${roomId}/players/${player.id}/name`).set(player.name);
+      db.ref(`rooms/${roomId}/players/${player.id}/avatar`).set(player.avatar);
+    }
+  }, [player]);
+
+  // ── Auto-join from URL ──
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('room');
+    if (code && code.length===4) {
+      setRoomInput(code);
+      joinRoom(code);
+    }
+  }, []);
+
+  // ── Firebase listener ──
+  useEffect(() => {
+    if (!roomId) return;
+    const ref = db.ref(`rooms/${roomId}`);
+    ref.on('value', snap => {
+      const val = snap.val();
+      if (!val) return;
+      const prev = prevPhase.current;
+
+      if (val.phase==='REVEALED' && prev!=='REVEALED') {
+        SFX.reveal();
+        setFlashClass('flash-red');
+        setTimeout(()=>setFlashClass(''), 700);
+        setShowResult(true);
+      }
+      if (val.phase==='PLAYING' && prev==='REVEALED') {
+        setShowResult(false);
+        SFX.shake();
+        // Check if pile grew
+        const newPile = val.tableDice||0;
+        if (newPile > (prevPile.current||0)) {
+          setPileJustAdded(true);
+          setTimeout(()=>setPileJustAdded(false), 800);
+        }
+        prevPile.current = newPile;
+        setBid({qty:1, val:2});
+      }
+      if (val.phase==='WON' && prev!=='WON') {
+        SFX.win();
+        confetti({ particleCount:180, spread:80, origin:{y:.5}, colors:['#f5c842','#2ecc71','#ff6b6b'] });
+        setTimeout(()=>confetti({ particleCount:80, spread:120, origin:{x:.1,y:.3} }), 500);
+        setTimeout(()=>confetti({ particleCount:80, spread:120, origin:{x:.9,y:.3} }), 700);
+      }
+      if (val.phase==='PLAYING' && val.currentBid && prev==='PLAYING') {
+        setBid(val.currentBid ? {qty:val.currentBid.quantity, val:val.currentBid.value} : {qty:1,val:2});
+      }
+
+      prevPhase.current = val.phase;
+      setGs(val);
+    });
+    return () => ref.off();
+  }, [roomId]);
+
+  // ── Room actions ──
+  const createRoom = () => {
+    const code = Math.floor(1000+Math.random()*9000).toString();
+    const init = {
+      roomId:code, hostId:player.id, phase:'LOBBY',
+      turnIndex:0, playerSequence:[player.id], tableDice:0,
+      players:{ [player.id]: {...player, diceCount:5, dice:[]} }
+    };
+    db.ref(`rooms/${code}`).set(init);
+    setRoomId(code);
+    setGs(init);
+    SFX.click();
+    window.history.pushState({}, '', `?room=${code}`);
+  };
+
+  const joinRoom = (code) => {
+    const c = (code||roomInput||'').toString().trim().toUpperCase();
+    if (!c || c.length!==4) return;
+    db.ref(`rooms/${c}`).transaction(room => {
+      if (!room) return room;
+      if (!room.players[player.id]) {
+        const vals = Object.values(room.players);
+        const minDice = room.phase==='PLAYING' ? Math.min(...vals.map(p=>p.diceCount)) : 5;
+        room.players[player.id] = {...player, diceCount:minDice, dice:[]};
+        room.playerSequence = room.playerSequence || [];
+        if (!room.playerSequence.includes(player.id)) room.playerSequence.push(player.id);
+      }
+      return room;
+    }, (err, committed, snap) => {
+      const val = snap && snap.val();
+      if (val) {
+        setRoomId(c);
+        setGs(val);
+        SFX.click();
+        window.history.pushState({}, '', `?room=${c}`);
+      } else {
+        notify('❌');
+      }
+    });
+  };
+
+  const startGame = () => {
+    const np = {...gs.players};
+    Object.keys(np).forEach(pid => { np[pid].dice = rollDice(np[pid].diceCount); });
+    db.ref(`rooms/${roomId}`).update({ phase:'PLAYING', players:np, currentBid:null, turnIndex:0, lastAction:null });
+    SFX.shake();
+  };
+
+  const placeBid = () => {
+    const cur = gs.currentBid;
+    if (cur) {
+      const ok = bid.qty > cur.quantity || (bid.qty===cur.quantity && bid.val>cur.value);
+      if (!ok) { SFX.lose(); notify('⬆️'); return; }
+    }
+    const next = (gs.turnIndex+1) % gs.playerSequence.length;
+    db.ref(`rooms/${roomId}`).update({
+      currentBid: { quantity:bid.qty, value:bid.val, playerId:player.id },
+      turnIndex: next
+    });
+    SFX.place();
+  };
+
+  const callDudo = () => {
+    const cb = gs.currentBid;
+    const allDice = Object.values(gs.players).flatMap(p=>p.dice||[]);
+    const count = allDice.filter(d => d===cb.value || (cb.value!==1 && d===1)).length;
+    const callerWon = count < cb.quantity;
+    const loserId = callerWon ? cb.playerId : player.id;
+    const np = {...gs.players};
+    np[loserId] = { ...np[loserId], diceCount: Math.max(0, np[loserId].diceCount-1) };
+    db.ref(`rooms/${roomId}`).update({
+      phase:'REVEALED', players:np,
+      lastAction:{ type:'DUDO', caller:player.id, bidder:cb.playerId,
+        success:callerWon, loserId, actualCount:count, bidWas:cb }
+    });
+    callerWon ? SFX.win() : SFX.lose();
+  };
+
+  const nextRound = () => {
+    const np = {...gs.players};
+    const alive = gs.playerSequence.filter(pid => (np[pid]?.diceCount||0) > 0);
+    if (alive.length===1) {
+      db.ref(`rooms/${roomId}`).update({ phase:'WON', winnerId:alive[0] });
+      return;
+    }
+    const newPile = (gs.tableDice||0) + 1;
+    alive.forEach(pid => { np[pid].dice = rollDice(np[pid].diceCount); });
+    db.ref(`rooms/${roomId}`).update({
+      phase:'PLAYING', players:np, playerSequence:alive,
+      turnIndex:0, currentBid:null, lastAction:null, tableDice:newPile
+    });
+  };
+
+  const shareRoom = () => {
+    const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+    navigator.clipboard.writeText(url).catch(()=>{});
+    setCopied(true);
+    setTimeout(()=>setCopied(false), 2200);
+    SFX.click();
+  };
+
+  const notify = (msg) => {
+    setNotification(msg);
+    setTimeout(()=>setNotification(null), 1800);
+  };
+
+  const nextAvatar = () => {
+    const i = AVATARS.indexOf(player.avatar);
+    setPlayer(p => ({...p, avatar: AVATARS[(i+1)%AVATARS.length]}));
+  };
+
+  // ── Derived ──
+  const me = gs?.players?.[player.id];
+  const isMyTurn = gs?.phase==='PLAYING' && gs.playerSequence[gs.turnIndex]===player.id;
+  const activeId = gs?.playerSequence[gs?.turnIndex];
+
+  const getResultState = pid => {
+    if (!gs?.lastAction || gs.phase!=='REVEALED') return null;
+    const la = gs.lastAction;
+    if (pid===la.loserId) return 'lost';
+    if (pid===la.caller && la.success) return 'won';
+    return null;
+  };
+
+  // ════════════════════════════════════════
+  // LOBBY SCREEN
+  // ════════════════════════════════════════
+  if (!gs) return React.createElement('div', {
+    style:{
+      width:'100%', height:'100%', height:'100dvh',
+      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+      gap:20, padding:'20px 24px'
+    }
+  },
+    // Giant dice icon
+    React.createElement('div', { style:{fontSize:'5rem', lineHeight:1, animation:'bounce-avatar 2.5s ease infinite'} }, '🎲'),
+
+    // Create button
+    React.createElement('button', {
+      className:'btn btn-gold',
+      style:{ width:'100%', maxWidth:300, padding:'16px 0', fontSize:'1.4rem' },
+      onClick: createRoom
+    }, '＋'),
+
+    // Join row
+    React.createElement('div', { style:{display:'flex', gap:8, width:'100%', maxWidth:300} },
+      React.createElement('input', {
+        className:'casino-input',
+        value:roomInput,
+        onChange:e=>setRoomInput(e.target.value.substring(0,4).toUpperCase()),
+        onKeyDown:e=>{ if(e.key==='Enter') joinRoom(); },
+        placeholder:'####',
+        style:{ flex:1, padding:'14px 10px', fontSize:'1.3rem', letterSpacing:8 }
+      }),
+      React.createElement('button', {
+        className:'btn btn-ghost',
+        style:{ padding:'14px 20px', fontSize:'1.2rem', borderRadius:12 },
+        onClick:()=>joinRoom()
+      }, '▶')
+    ),
+
+    notification && React.createElement('div', {
+      style:{
+        position:'fixed', top:'40%', left:'50%', transform:'translate(-50%,-50%)',
+        background:'rgba(232,64,64,.9)', borderRadius:20, padding:'10px 24px',
+        fontSize:'1.5rem', zIndex:999, animation:'pop-in .2s ease'
+      }
+    }, notification)
+  );
+
+  // ════════════════════════════════════════
+  // GAME SCREEN
+  // ════════════════════════════════════════
+  const allPlayers = gs.playerSequence.map(pid => gs.players[pid]).filter(Boolean);
+
+  return React.createElement('div', {
+    style:{
+      width:'100%', height:'100%', height:'100dvh',
+      display:'flex', flexDirection:'column', overflow:'hidden',
+      animation: flashClass ? `${flashClass} .5s ease` : 'none'
+    }
+  },
+
+    // ── RESULT OVERLAY ──
+    showResult && gs.phase==='REVEALED' && gs.lastAction &&
+    React.createElement(ResultScreen, { gs, myId:player.id, onNext:nextRound }),
+
+    // ── WIN SCREEN ──
+    gs.phase==='WON' && gs.winnerId && React.createElement('div', {
+      style:{
+        position:'fixed', inset:0, zIndex:200,
+        background:'radial-gradient(ellipse, #0f3d1a 0%, #050d08 100%)',
+        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+        gap:14, textAlign:'center', padding:20
+      }
+    },
+      React.createElement('div', { style:{fontSize:'5rem', animation:'bounce-avatar 1s infinite'} }, '🏆'),
+      React.createElement('div', { style:{fontSize:'3.5rem'} }, gs.players[gs.winnerId]?.avatar),
+      React.createElement('div', {
+        style:{ fontSize:'1.8rem', color:'#f5c842',
+          textShadow:'0 0 12px rgba(245,200,66,.7)', letterSpacing:2 }
+      }, gs.players[gs.winnerId]?.name),
+      gs.hostId===player.id && React.createElement('button', {
+        className:'btn btn-gold',
+        style:{ marginTop:8, padding:'14px 40px', fontSize:'1.1rem' },
+        onClick:startGame
+      }, '🔄')
+    ),
+
+    // ── HEADER ──
+    React.createElement('div', {
+      style:{
+        display:'flex', justifyContent:'space-between', alignItems:'center',
+        padding:'8px 12px', flexShrink:0,
+        background:'rgba(0,0,0,.3)', borderBottom:'1px solid rgba(255,255,255,.08)'
+      }
+    },
+      // Room code + share
+      React.createElement('div', { style:{display:'flex', alignItems:'center', gap:6} },
+        React.createElement('span', {
+          style:{ fontFamily:'monospace', fontSize:'1.3rem', color:'#f5c842', letterSpacing:4 }
+        }, roomId),
+        React.createElement('button', {
+          className:'btn btn-ghost',
+          style:{ padding:'4px 10px', fontSize:'.8rem', borderRadius:10, border:'1px solid rgba(255,255,255,.15)' },
+          onClick:shareRoom
+        }, copied ? '✅' : '🔗')
+      ),
+
+      // My card in header (tap avatar to cycle, tap name to edit)
+      me && React.createElement(PlayerCard, {
+        p:{ ...me, name:player.name, avatar:player.avatar },
+        isActive:false, resultState:null, isMe:true,
+        onEditAvatar:nextAvatar,
+        onEditName:n=>setPlayer(p=>({...p,name:n}))
+      })
+    ),
+
+    // ── TABLE AREA ──
+    React.createElement('div', {
+      style:{
+        flex:1, display:'flex', flexDirection:'column',
+        alignItems:'center', justifyContent:'space-between',
+        padding:'8px 10px', overflow:'hidden', gap:8
+      }
+    },
+
+      // ── PLAYERS ROW ──
+      React.createElement('div', {
+        style:{
+          display:'flex', justifyContent:'center', flexWrap:'wrap',
+          gap:8, width:'100%'
+        }
+      },
+        allPlayers.map(p =>
+          React.createElement(PlayerCard, {
+            key:p.id||p.name,
+            p,
+            isActive: activeId===p.id && gs.phase==='PLAYING',
+            resultState: getResultState(p.id),
+            isMe: p.id===player.id,
+            onEditAvatar: p.id===player.id ? nextAvatar : undefined,
+            onEditName: p.id===player.id ? n=>setPlayer(pp=>({...pp,name:n})) : undefined
+          })
+        )
+      ),
+
+      // ── CENTER: BID + PILE ──
+      React.createElement('div', {
+        style:{
+          display:'flex', alignItems:'center', justifyContent:'center', gap:16,
+          flex:1, width:'100%'
+        }
+      },
+        // Dice pile (left side)
+        (gs.tableDice > 0) && React.createElement(DicePile, {
+          count: gs.tableDice,
+          justAdded: pileJustAdded
         }),
 
-        // ── WINNER SCREEN ──
-        gameState.phase === 'WON' && gameState.winnerId &&
-        React.createElement('div', {
-            style:{
-                position:'fixed', inset:0, zIndex:300,
-                background:'linear-gradient(135deg, #0a1a06, #1a5c2a)',
-                display:'flex', flexDirection:'column',
-                alignItems:'center', justifyContent:'center', gap:16,
-                textAlign:'center', padding:24
-            }
-        },
-            React.createElement('div', { style:{fontSize:'5rem', animation:'bounce-jump 1s infinite'} }, '🏆'),
-            React.createElement('div', { style:{fontSize:'4rem'} }, gameState.players[gameState.winnerId]?.avatar),
-            React.createElement('h1', {
-                className:'neon-gold',
-                style:{fontFamily:"'Boogaloo', cursive", fontSize:'2.5rem', margin:'8px 0'}
-            }, gameState.players[gameState.winnerId]?.name),
-            React.createElement('div', { style:{fontSize:'1.5rem', color:'rgba(255,215,0,0.7)', letterSpacing:4} }, '🥇🏆🥇'),
-            gameState.hostId === player.id && React.createElement('button', {
-                className:'btn-gold',
-                style:{padding:'14px 36px', fontSize:'1.1rem', marginTop:12},
-                onClick:doStartGame
-            }, '🔄')
-        ),
-
-        // ── HEADER ──
-        React.createElement('div', {
-            style:{
-                display:'flex', justifyContent:'space-between', alignItems:'center',
-                padding:'8px 14px',
-                background:'rgba(0,0,0,0.4)',
-                borderBottom:'1px solid rgba(255,215,0,0.2)',
-                backdropFilter:'blur(8px)',
-                flexShrink:0
-            }
-        },
-            // Room code + share
-            React.createElement('div', { style:{display:'flex', alignItems:'center', gap:8} },
-                React.createElement('span', { style:{fontFamily:'monospace', fontSize:'1.4rem', color:'rgba(255,215,0,0.9)', letterSpacing:4, fontWeight:'bold'} }, roomId),
-                React.createElement('button', {
-                    onClick:doShare,
-                    style:{
-                        background: copiedLink ? 'rgba(0,200,100,0.3)' : 'rgba(255,215,0,0.15)',
-                        border:`1px solid ${copiedLink ? 'rgba(0,200,100,0.6)' : 'rgba(255,215,0,0.3)'}`,
-                        borderRadius:10, padding:'4px 10px', cursor:'pointer',
-                        display:'flex', alignItems:'center', gap:4,
-                        color:'white', fontSize:'0.8rem', transition:'all 0.2s'
-                    }
-                }, copiedLink ? '✅' : '🔗')
-            ),
-            // Total dice counter
-            React.createElement('div', { style:{textAlign:'center'} },
-                React.createElement('div', { style:{fontSize:'0.6rem', color:'rgba(255,215,0,0.5)', letterSpacing:2} }, ''),
-                React.createElement('div', { style:{fontSize:'1rem', color:'rgba(255,215,0,0.8)'} }, `🎲×${totalDiceInGame}`)
-            ),
-            // My avatar + edit name
-            React.createElement('div', {
-                style:{display:'flex', alignItems:'center', gap:6, cursor:'pointer'},
-                onClick:()=>{ setTempName(player.name); setEditingName(!editingName); }
-            },
-                editingName
-                    ? React.createElement('input', {
-                        className:'casino-input',
-                        value:tempName,
-                        onChange:e=>setTempName(e.target.value.substring(0,12)),
-                        onBlur:()=>{ updateMyName(tempName); setEditingName(false); },
-                        onKeyDown:e=>{ if(e.key==='Enter'||e.key==='Escape'){ updateMyName(tempName); setEditingName(false); } },
-                        autoFocus:true, style:{width:80, padding:'4px 6px', fontSize:'0.9rem'},
-                        onClick:e=>e.stopPropagation()
-                    })
-                    : React.createElement('div', { style:{fontSize:'0.85rem', color:'rgba(255,255,255,0.8)'} }, player.name + ' ' + player.avatar),
-                React.createElement('span', { style:{opacity:0.4, fontSize:'0.7rem'} }, '✎')
-            )
-        ),
-
-        // ── MAIN TABLE ──
-        React.createElement('div', {
-            style:{flex:1, display:'flex', flexDirection:'column', alignItems:'center', overflow:'hidden', position:'relative', padding:'8px 10px'}
-        },
-
-            // ── OPPONENTS ROW ──
-            React.createElement('div', {
-                style:{display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap', marginBottom:8, width:'100%'}
-            },
-                opponents.map(pid => {
-                    const p = gameState.players[pid];
-                    const isActive = activePlayerId === pid && gameState.phase === 'PLAYING';
-                    return React.createElement(PlayerCard, {
-                        key:pid, player:p, isActive,
-                        resultState: getResultState(pid),
-                        isMe: false
-                    });
-                }),
-                // ME as card too
-                me && React.createElement(PlayerCard, {
-                    key:player.id+'self', player:{...me, name:player.name, avatar:player.avatar},
-                    isActive: activePlayerId === player.id && gameState.phase === 'PLAYING',
-                    resultState: getResultState(player.id),
-                    onEditName: updateMyName,
-                    isMe: true
-                })
-            ),
-
-            // ── CENTER AREA ──
-            React.createElement('div', {
-                style:{flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, width:'100%'}
-            },
-                // LOBBY
-                gameState.phase === 'LOBBY' && React.createElement('div', { style:{textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:14} },
-                    React.createElement('div', { style:{fontSize:'2.5rem', opacity:0.6, animation:'spin 8s linear infinite'} }, '⚙️'),
-                    React.createElement('div', { style:{fontSize:'1.2rem', color:'rgba(255,255,255,0.5)', letterSpacing:3} },
-                        gameState.playerSequence.length, ' 🎮'
-                    ),
-                    gameState.hostId === player.id && gameState.playerSequence.length >= 1 &&
-                    React.createElement('button', {
-                        className:'btn-gold',
-                        style:{padding:'16px 44px', fontSize:'1.4rem', marginTop:8},
-                        onClick:doStartGame
-                    }, '🎰 ▶')
-                ),
-
-                // CURRENT BID (center)
-                gameState.phase === 'PLAYING' && React.createElement(BidDisplay, {
-                    bid: gameState.currentBid,
-                    players: gameState.players
-                }),
-
-                // DICE PILE (lost dice on table)
-                React.createElement(DicePile, { count: gameState.tableDiceCount || 0 })
-            )
-        ),
-
-        // ── BOTTOM CONTROLS ──
-        React.createElement('div', { style:{flexShrink:0} },
-
-            // ── BET CONTROLS (only my turn) ──
-            isMyTurn && gameState.phase === 'PLAYING' &&
-            React.createElement('div', { className:'controls-panel', style:{padding:'12px 14px 10px'} },
-                // Bid row: [−] quantity [+]  ×  [‹] dice [›]
-                React.createElement('div', { style:{display:'flex', alignItems:'center', justifyContent:'center', gap:12, marginBottom:10} },
-                    // Quantity: − left, number, + right
-                    React.createElement('div', { style:{display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.07)', borderRadius:14, padding:'6px 10px'} },
-                        React.createElement('button', {
-                            style:{width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', color:'white', fontSize:'1.3rem', cursor:'pointer'},
-                            onClick:()=>setLocalBid(b=>({...b, quantity:Math.max(1,b.quantity-1)}))
-                        }, '−'),
-                        React.createElement('span', { style:{fontSize:'2rem', fontWeight:'bold', minWidth:36, textAlign:'center'} }, localBid.quantity),
-                        React.createElement('button', {
-                            style:{width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', color:'white', fontSize:'1.3rem', cursor:'pointer'},
-                            onClick:()=>setLocalBid(b=>({...b, quantity:b.quantity+1}))
-                        }, '+')
-                    ),
-                    React.createElement('span', { style:{fontSize:'1.3rem', opacity:0.35} }, '×'),
-                    // Dice face: ‹ left, dice, › right
-                    React.createElement('div', { style:{display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.07)', borderRadius:14, padding:'6px 10px'} },
-                        React.createElement('button', {
-                            style:{width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', color:'white', fontSize:'1.3rem', cursor:'pointer'},
-                            onClick:()=>setLocalBid(b=>({...b, value:b.value===1?6:b.value-1}))
-                        }, '‹'),
-                        React.createElement(DiceIcon, { value:localBid.value, size:42 }),
-                        React.createElement('button', {
-                            style:{width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', color:'white', fontSize:'1.3rem', cursor:'pointer'},
-                            onClick:()=>setLocalBid(b=>({...b, value:b.value===6?1:b.value+1}))
-                        }, '›')
-                    )
-                ),
-                // My dice — shown inline, no cup
-                me?.dice?.length > 0 && React.createElement('div', {
-                    style:{display:'flex', justifyContent:'center', gap:6, marginBottom:10}
+        // Current bid (center)
+        React.createElement('div', { style:{flex:1, display:'flex', justifyContent:'center'} },
+          gs.phase==='PLAYING'
+            ? React.createElement(BidCenter, { bid:gs.currentBid, players:gs.players })
+            : gs.phase==='LOBBY'
+              ? React.createElement('div', {
+                  style:{display:'flex', flexDirection:'column', alignItems:'center', gap:12}
                 },
-                    me.dice.map((d,i) => React.createElement(DiceIcon, { key:i, value:d, size:36 }))
-                ),
-                // Action buttons
-                React.createElement('div', { style:{display:'flex', gap:8} },
-                    gameState.currentBid && React.createElement('button', {
-                        onClick:doCallDudo,
-                        style:{
-                            flex:1, padding:'13px 0', borderRadius:16, border:'3px solid #ff3b3b',
-                            background:'linear-gradient(135deg, #7a0000, #cc0000)',
-                            color:'white', fontSize:'1.5rem', cursor:'pointer',
-                            fontFamily:"'Fredoka One', cursive",
-                            boxShadow:'0 0 16px rgba(255,59,59,0.4)'
-                        }
-                    }, '🚨'),
-                    React.createElement('button', {
-                        onClick:doPlaceBid,
-                        className:'btn-gold',
-                        style:{flex:2, padding:'13px 0', fontSize:'1.5rem', borderRadius:16}
-                    }, '🎯')
+                  React.createElement('div', {
+                    style:{fontSize:'2.2rem', opacity:.5, animation:'spin 6s linear infinite'}
+                  }, '⚙️'),
+                  React.createElement('div', {
+                    style:{fontSize:'1rem', color:'rgba(255,255,255,.4)', letterSpacing:2}
+                  }, gs.playerSequence.length + ' 🎮'),
+                  gs.hostId===player.id && React.createElement('button', {
+                    className:'btn btn-gold',
+                    style:{padding:'14px 40px', fontSize:'1.3rem', marginTop:4},
+                    onClick:startGame
+                  }, '▶')
                 )
-            ),
+              : null
+        )
+      )
+    ),
 
-            // ── NOT MY TURN: show my dice only ──
-            gameState.phase === 'PLAYING' && !isMyTurn && me?.dice?.length > 0 &&
-            React.createElement('div', {
-                style:{padding:'10px 14px 12px', display:'flex', justifyContent:'center', gap:6,
-                    background:'rgba(0,0,0,0.3)', borderTop:'1px solid rgba(255,255,255,0.08)'}
-            },
-                me.dice.map((d,i) => React.createElement(DiceIcon, { key:i, value:d, size:38 }))
-            ),
+    // ── CONTROLS ──
+    isMyTurn && gs.phase==='PLAYING' && React.createElement('div', { className:'controls-panel' },
+      // My dice (always visible above controls when it's my turn)
+      me?.dice?.length > 0 && React.createElement('div', {
+        style:{display:'flex', justifyContent:'center', gap:6, marginBottom:10}
+      },
+        me.dice.map((d,i) => React.createElement(Dice, { key:i, val:d, size:40 }))
+      ),
 
-            gameState.phase === 'LOBBY' && React.createElement('div', { style:{height:12} })
+      // Bid selectors row
+      React.createElement('div', {
+        style:{display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:10}
+      },
+        // Quantity [ − N + ]
+        React.createElement('div', {
+          style:{display:'flex', alignItems:'center', gap:6,
+            background:'rgba(255,255,255,.07)', borderRadius:14, padding:'5px 10px'}
+        },
+          React.createElement('button', {
+            className:'btn btn-ghost',
+            style:{width:34, height:34, padding:0, fontSize:'1.3rem', borderRadius:'50%', border:'none'},
+            onClick:()=>setBid(b=>({...b, qty:Math.max(1,b.qty-1)}))
+          }, '−'),
+          React.createElement('span', {
+            style:{fontSize:'2rem', fontWeight:'bold', minWidth:36, textAlign:'center', color:'white'}
+          }, bid.qty),
+          React.createElement('button', {
+            className:'btn btn-ghost',
+            style:{width:34, height:34, padding:0, fontSize:'1.3rem', borderRadius:'50%', border:'none'},
+            onClick:()=>setBid(b=>({...b, qty:b.qty+1}))
+          }, '+')
         ),
 
-        // Notification toast
-        notification && React.createElement('div', {
-            style:{
-                position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-                background:'rgba(255,60,60,0.9)', borderRadius:20, padding:'12px 28px',
-                fontSize:'1.8rem', zIndex:999, pointerEvents:'none',
-                animation:'floatIn 0.2s ease'
-            }
-        }, notification)
-    );
+        React.createElement('span', { style:{opacity:.3, fontSize:'1.2rem'} }, '×'),
+
+        // Die face [ ‹ D › ]
+        React.createElement('div', {
+          style:{display:'flex', alignItems:'center', gap:6,
+            background:'rgba(255,255,255,.07)', borderRadius:14, padding:'5px 10px'}
+        },
+          React.createElement('button', {
+            className:'btn btn-ghost',
+            style:{width:34, height:34, padding:0, fontSize:'1.3rem', borderRadius:'50%', border:'none'},
+            onClick:()=>setBid(b=>({...b, val:b.val===1?6:b.val-1}))
+          }, '‹'),
+          React.createElement(Dice, { val:bid.val, size:42 }),
+          React.createElement('button', {
+            className:'btn btn-ghost',
+            style:{width:34, height:34, padding:0, fontSize:'1.3rem', borderRadius:'50%', border:'none'},
+            onClick:()=>setBid(b=>({...b, val:b.val===6?1:b.val+1}))
+          }, '›')
+        )
+      ),
+
+      // Action buttons
+      React.createElement('div', { style:{display:'flex', gap:8} },
+        gs.currentBid && React.createElement('button', {
+          className:'btn btn-red',
+          style:{flex:1, padding:'13px 0', fontSize:'1.4rem'},
+          onClick:callDudo
+        }, '🚨'),
+        React.createElement('button', {
+          className:'btn btn-gold',
+          style:{flex:2, padding:'13px 0', fontSize:'1.4rem'},
+          onClick:placeBid
+        }, '🎯')
+      )
+    ),
+
+    // When not my turn — show my dice quietly
+    !isMyTurn && gs.phase==='PLAYING' && me?.dice?.length > 0 &&
+    React.createElement('div', {
+      style:{
+        padding:'8px 14px 10px', display:'flex', justifyContent:'center', gap:6,
+        background:'rgba(0,0,0,.25)', borderTop:'1px solid rgba(255,255,255,.06)', flexShrink:0
+      }
+    },
+      me.dice.map((d,i) => React.createElement(Dice, { key:i, val:d, size:38 }))
+    ),
+
+    // Toast notification
+    notification && React.createElement('div', {
+      style:{
+        position:'fixed', top:'45%', left:'50%', transform:'translate(-50%,-50%)',
+        background:'rgba(232,64,64,.9)', borderRadius:16, padding:'10px 24px',
+        fontSize:'1.5rem', zIndex:999, pointerEvents:'none',
+        animation:'pop-in .2s ease'
+      }
+    }, notification)
+  );
 };
+
+// ── SPIN keyframe fix for spin ──
+const style = document.createElement('style');
+style.textContent = `@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`;
+document.head.appendChild(style);
 
 ReactDOM.render(React.createElement(App), document.getElementById('root'));
 </script>
