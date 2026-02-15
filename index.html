@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LADODO - Casino Edition</title>
+    <title>LADODO - Visual Edition</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -13,129 +13,76 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Righteous&family=Roboto:wght@400;700&display=swap');
-
         body { 
-            background: radial-gradient(circle at center, #2e1065 0%, #020617 100%);
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
             color: white; 
             user-select: none; 
-            font-family: 'Roboto', sans-serif; 
+            font-family: sans-serif; 
             overflow: hidden;
             touch-action: manipulation;
         }
-        
-        h1, .casino-font { font-family: 'Righteous', cursive; }
 
         /* Animations */
-        @keyframes shake {
+        @keyframes bounce-win {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-30px) scale(1.2); }
+        }
+        @keyframes shake-lose {
             0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-1px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            60% { transform: translate(-3px, 1px) rotate(0deg); }
-            70% { transform: translate(3px, 1px) rotate(-1deg); }
-            80% { transform: translate(-1px, -1px) rotate(1deg); }
-            90% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(1px, -2px) rotate(-1deg); }
+            10% { transform: translate(-3px, -2px) rotate(-5deg); }
+            30% { transform: translate(3px, 2px) rotate(5deg); }
+            50% { transform: translate(-3px, 1px) rotate(-5deg); }
+            100% { transform: translate(0, 0) rotate(0); }
+        }
+        @keyframes pulse-turn {
+            0% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(250, 204, 21, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); }
         }
 
-        @keyframes pulse-gold {
-            0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(234, 179, 8, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
-        }
-
-        @keyframes slide-up {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .shake-element { animation: shake 0.5s; animation-iteration-count: infinite; }
-        .shake-screen { animation: shake 0.5s; animation-iteration-count: 1; }
+        .winner-anim { animation: bounce-win 0.6s infinite; z-index: 50; }
+        .loser-anim { animation: shake-lose 0.5s infinite; filter: sepia(1) hue-rotate(-50deg) saturate(3); z-index: 50; }
         
-        .active-player {
-            border: 2px solid #eab308;
-            background: rgba(234, 179, 8, 0.1);
-            animation: pulse-gold 2s infinite;
+        .active-turn {
+            border: 3px solid #facc15; /* Yellow */
+            animation: pulse-turn 1.5s infinite;
+            background: rgba(250, 204, 21, 0.1);
         }
 
-        .dice-3d {
-            box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 2px 2px 5px rgba(255,255,255,0.2);
-        }
-
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .neon-text {
-            text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px #eab308, 0 0 30px #eab308;
-        }
+        .dice-3d { filter: drop-shadow(2px 4px 6px black); }
+        .dead-dice { filter: grayscale(1) opacity(0.3); }
+        
+        /* Glassmorphism */
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script>
-        // --- SOUND ENGINE (Synthesized) ---
+        // --- SOUNDS ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        const playSound = (type) => {
+        const playTone = (freq, type, dur) => {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
+            osc.frequency.value = freq;
+            osc.type = type;
             osc.connect(gain);
             gain.connect(audioCtx.destination);
-
-            const now = audioCtx.currentTime;
-
-            if (type === 'click') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, now);
-                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-                osc.start(now);
-                osc.stop(now + 0.1);
-            } else if (type === 'win') {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(400, now);
-                osc.frequency.linearRampToValueAtTime(800, now + 0.1);
-                osc.frequency.linearRampToValueAtTime(1200, now + 0.3);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.5);
-                osc.start(now);
-                osc.stop(now + 0.5);
-            } else if (type === 'error') {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(150, now);
-                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
-                gain.gain.setValueAtTime(0.2, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.3);
-                osc.start(now);
-                osc.stop(now + 0.3);
-            } else if (type === 'shake') {
-                // Noise buffer for shake
-                const bufferSize = audioCtx.sampleRate * 0.2;
-                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-                
-                const noise = audioCtx.createBufferSource();
-                noise.buffer = buffer;
-                const noiseGain = audioCtx.createGain();
-                noiseGain.gain.setValueAtTime(0.1, now);
-                noiseGain.gain.linearRampToValueAtTime(0, now + 0.2);
-                noise.connect(noiseGain);
-                noiseGain.connect(audioCtx.destination);
-                noise.start(now);
-            }
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + dur);
+            osc.stop(audioCtx.currentTime + dur);
         };
 
-        // --- FIREBASE SETUP ---
+        const Sounds = {
+            click: () => playTone(600, 'sine', 0.1),
+            error: () => playTone(150, 'sawtooth', 0.4),
+            win: () => { playTone(400, 'square', 0.1); setTimeout(() => playTone(600, 'square', 0.2), 100); },
+            reveal: () => playTone(800, 'triangle', 0.5)
+        };
+
+        // --- FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyCUvDUDrj1MofAFRYeDrGP7OoIz0qX0iW8",
             authDomain: "dudogame-44b81.firebaseapp.com",
@@ -148,453 +95,316 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect } = React;
 
-        // --- ICONS & ASSETS ---
-        const AVATARS = ['😎', '🤠', '👽', '👻', '🤖', '🦊', '🦁', '🦄', '🐸', '🐵'];
-        
-        const DiceIcon = ({ value, size = 50, color = 'white' }) => {
+        // --- COMPONENTS ---
+        const Dice = ({ val, size=40, highlight=false }) => {
             const dots = {
-                1: [[50, 50]], 2: [[25, 25], [75, 75]], 3: [[25, 25], [50, 50], [75, 75]],
-                4: [[25, 25], [25, 75], [75, 25], [75, 75]], 
-                5: [[25, 25], [25, 75], [50, 50], [75, 25], [75, 75]],
-                6: [[25, 25], [25, 50], [25, 75], [75, 25], [75, 50], [75, 75]]
+                1: [[50,50]], 2: [[25,25],[75,75]], 3: [[25,25],[50,50],[75,75]],
+                4: [[25,25],[25,75],[75,25],[75,75]], 5: [[25,25],[25,75],[50,50],[75,25],[75,75]],
+                6: [[25,25],[25,50],[25,75],[75,25],[75,50],[75,75]]
             };
-            return React.createElement('svg', { width: size, height: size, viewBox: '0 0 100 100', className: 'dice-3d drop-shadow-md' },
-                React.createElement('rect', { x: 5, y: 5, width: 90, height: 90, rx: 15, fill: value === 1 ? '#ef4444' : '#1e293b', stroke: 'rgba(255,255,255,0.5)', strokeWidth: 2 }),
-                dots[value]?.map(([cx, cy], i) => React.createElement('circle', { key: i, cx, cy, r: 8, fill: 'white' }))
+            return React.createElement('svg', { width: size, height: size, viewBox: '0 0 100 100', className: `dice-3d transition-all ${highlight ? 'scale-125 z-10' : ''}` },
+                React.createElement('rect', { x:5, y:5, width:90, height:90, rx:15, fill: val===1 && !highlight ? '#ef4444' : (highlight ? '#22c55e' : 'white') }),
+                dots[val]?.map(([cx,cy],i) => React.createElement('circle', { key:i, cx, cy, r:8, fill: 'black' }))
             );
         };
 
-        // --- MAIN APPLICATION ---
+        const Avatar = ({ icon, name, diceCount, state, isActive, onClick }) => {
+            return React.createElement('div', { onClick, className: `relative flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${isActive ? 'active-turn scale-110' : 'opacity-80'} ${state === 'win' ? 'winner-anim' : ''} ${state === 'lose' ? 'loser-anim' : ''}` },
+                React.createElement('div', { className: 'text-4xl filter drop-shadow-md' }, icon),
+                React.createElement('div', { className: 'font-bold text-xs bg-black/50 px-2 rounded mt-1' }, name),
+                React.createElement('div', { className: 'flex gap-1 mt-1' },
+                    Array.from({length: Math.max(0, diceCount)}).map((_,i) => 
+                        React.createElement('div', { key:i, className: 'w-2 h-2 rounded-full bg-yellow-400 shadow-md' })
+                    )
+                )
+            );
+        };
+
         const App = () => {
-            // -- State --
-            const [player, setPlayer] = useState(() => {
-                const saved = JSON.parse(sessionStorage.getItem('ladodo_player') || '{}');
-                return {
-                    id: saved.id || Math.random().toString(36).substring(2, 9),
-                    name: saved.name || 'Player',
-                    avatar: saved.avatar || AVATARS[Math.floor(Math.random() * AVATARS.length)]
-                };
-            });
+            // Player Local State
+            const [me, setMe] = useState(() => JSON.parse(sessionStorage.getItem('ladodo_me') || `{"id":"${Math.random().toString(36).substring(2,7)}","name":"Player","icon":"😎"}`));
+            const [roomId, setRoomId] = useState(new URLSearchParams(window.location.search).get('room') || '');
+            const [roomState, setRoomState] = useState(null);
             
-            const [gameState, setGameState] = useState(null);
-            const [roomId, setRoomId] = useState('');
-            const [localBid, setLocalBid] = useState(null); // { quantity, value }
-            const [cupOpen, setCupOpen] = useState(false);
-            const [shaking, setShaking] = useState(false);
-            const [screenShake, setScreenShake] = useState(false);
-            const [notification, setNotification] = useState(null); // { text, type }
-            const [isEditMode, setIsEditMode] = useState(false); // Edit name/avatar
+            // UI State
+            const [editing, setEditing] = useState(false);
+            const [bid, setBid] = useState({ q: 1, v: 2 });
+            const [cupOpen, setCupOpen] = useState(true);
 
-            // -- Refs --
-            const audioRef = useRef(null);
+            // Sync User
+            useEffect(() => sessionStorage.setItem('ladodo_me', JSON.stringify(me)), [me]);
 
-            // -- Effects --
+            // Sync Room
             useEffect(() => {
-                // Save player info
-                sessionStorage.setItem('ladodo_player', JSON.stringify(player));
-            }, [player]);
-
-            // Auto-join from URL
-            useEffect(() => {
-                const params = new URLSearchParams(window.location.search);
-                const code = params.get('room');
-                if (code) {
-                    setRoomId(code);
-                    joinRoom(code);
-                }
-            }, []);
-
-            // Game Loop Listener
-            useEffect(() => {
-                if (!roomId || !gameState) return;
-                const roomRef = db.ref(`rooms/${roomId}`);
-                
-                const handleUpdate = (snap) => {
+                if (!roomId) return;
+                const ref = db.ref(`rooms/${roomId}`);
+                ref.on('value', snap => {
                     const val = snap.val();
                     if (val) {
-                        // Check for Earthquakes (Dudo called)
-                        if (val.phase === 'REVEALED' && gameState.phase !== 'REVEALED') {
-                            playSound('error'); // Dudo sound
-                            setScreenShake(true);
-                            setTimeout(() => setScreenShake(false), 500);
-                            
-                            // Auto restart logic (Host only needs to trigger, but we can make anyone trigger safely via transaction)
-                            if (val.hostId === player.id) {
-                                setTimeout(() => {
-                                    startNextRound(val);
-                                }, 5000); // 5 Seconds delay
-                            }
+                        setRoomState(val);
+                        // Auto-update local bid to match current bid + 1
+                        if (val.currentBid && val.phase === 'PLAYING' && val.turnIndex !== undefined && val.playerSequence[val.turnIndex] === me.id) {
+                            setBid(val.currentBid); 
                         }
-
-                        // Check for Winner
-                        if (val.phase === 'WON' && gameState.phase !== 'WON') {
-                            playSound('win');
-                            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-                        }
-
-                        setGameState(val);
-
-                        // Reset local bid when turn changes
-                        if (val.currentBid && val.phase === 'PLAYING') {
-                            // Default to current bid (user must increase)
-                            setLocalBid(val.currentBid); 
-                        } else {
-                            // New round defaults
-                            setLocalBid({ quantity: 1, value: 2 });
+                        // Confetti on win
+                        if (val.phase === 'REVEALED' && !roomState?.phase?.includes('REVEALED')) {
+                            const outcome = val.lastResult;
+                            if (outcome && outcome.winner === me.id) confetti();
+                            Sounds.reveal();
                         }
                     }
-                };
+                });
+                return () => ref.off();
+            }, [roomId]);
 
-                roomRef.on('value', handleUpdate);
-                return () => roomRef.off();
-            }, [roomId, gameState?.phase]);
-
-            // -- Logic --
-
-            const createRoom = () => {
-                const code = Math.floor(1000 + Math.random() * 9000).toString();
-                const initial = {
-                    roomId: code,
-                    hostId: player.id,
-                    phase: 'LOBBY',
-                    turnIndex: 0,
-                    playerSequence: [player.id],
-                    players: {
-                        [player.id]: { ...player, diceCount: 5, dice: [] }
-                    }
-                };
-                db.ref(`rooms/${code}`).set(initial);
-                setRoomId(code);
-                setGameState(initial);
-                playSound('click');
+            // Actions
+            const updateMe = (updates) => {
+                const newMe = { ...me, ...updates };
+                setMe(newMe);
+                if (roomId) db.ref(`rooms/${roomId}/players/${me.id}`).update(updates);
             };
 
-            const joinRoom = (code = roomId) => {
-                if (code.length !== 4) return;
-                db.ref(`rooms/${code}`).transaction((room) => {
-                    if (room) {
-                        if (!room.players[player.id]) {
-                            // Late joiner logic: Get min dice count
-                            const existingPlayers = Object.values(room.players);
-                            const minDice = room.phase === 'PLAYING' 
-                                ? Math.min(...existingPlayers.map(p => p.diceCount)) 
-                                : 5;
-
-                            room.players[player.id] = { ...player, diceCount: minDice, dice: [] };
-                            room.playerSequence.push(player.id);
-                        }
+            const join = () => {
+                const code = roomId || Math.floor(1000 + Math.random()*9000).toString();
+                setRoomId(code);
+                db.ref(`rooms/${code}`).transaction(room => {
+                    if (!room) room = { phase: 'LOBBY', players: {}, playerSequence: [], history: [] };
+                    if (!room.players[me.id]) {
+                        // Late join logic: take min dice
+                        const minDice = Object.values(room.players).length ? Math.min(...Object.values(room.players).map(p=>p.diceCount)) : 5;
+                        room.players[me.id] = { ...me, diceCount: minDice, dice: [] };
+                        room.playerSequence.push(me.id);
                     }
                     return room;
-                }, (error, committed, snapshot) => {
-                    if (committed) {
-                        setRoomId(code);
-                        setGameState(snapshot.val());
-                        playSound('click');
-                    } else {
-                        alert("Room not found!");
-                    }
                 });
             };
-
-            const shareRoom = () => {
-                const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-                navigator.clipboard.writeText(url);
-                setNotification("Link Copied!");
-                setTimeout(() => setNotification(null), 2000);
-            };
-
-            const rollDice = (count) => Array.from({ length: count }, () => Math.floor(Math.random() * 6) + 1);
 
             const startGame = () => {
-                const updates = {};
-                const newPlayers = { ...gameState.players };
-                
-                // Roll for everyone
-                Object.keys(newPlayers).forEach(pid => {
-                    newPlayers[pid].dice = rollDice(newPlayers[pid].diceCount);
-                });
-
+                const players = roomState.players;
+                Object.keys(players).forEach(id => players[id].dice = Array.from({length: players[id].diceCount}, () => Math.ceil(Math.random()*6)));
                 db.ref(`rooms/${roomId}`).update({
-                    phase: 'PLAYING',
-                    players: newPlayers,
-                    currentBid: null,
-                    turnIndex: 0,
-                    lastAction: null
+                    phase: 'PLAYING', players, currentBid: null, turnIndex: 0, lastResult: null
                 });
-                
-                // Shake effect for everyone handled by phase change ideally, but we simulate locally
-                setShaking(true);
-                playSound('shake');
-                setTimeout(() => setShaking(false), 1000);
             };
 
-            const startNextRound = (currentRoomState) => {
-                const newPlayers = { ...currentRoomState.players };
-                const playersLeft = currentRoomState.playerSequence.filter(pid => newPlayers[pid].diceCount > 0);
-
-                if (playersLeft.length === 1) {
-                    db.ref(`rooms/${roomId}`).update({ phase: 'WON', winnerId: playersLeft[0] });
-                    return;
-                }
-
-                // Reroll
-                Object.keys(newPlayers).forEach(pid => {
-                    if (newPlayers[pid].diceCount > 0) {
-                        newPlayers[pid].dice = rollDice(newPlayers[pid].diceCount);
-                    } else {
-                        newPlayers[pid].dice = [];
+            const submitBid = () => {
+                // Validate: Must be higher quantity OR same quantity higher value
+                const curr = roomState.currentBid;
+                if (curr) {
+                    if (bid.q < curr.q || (bid.q === curr.q && bid.v <= curr.v)) {
+                        Sounds.error();
+                        // Shake button visual
+                        return;
                     }
-                });
-
-                // Rotate start player
-                let nextStart = (currentRoomState.turnIndex + 1) % playersLeft.length; 
-
+                }
+                const nextTurn = (roomState.turnIndex + 1) % roomState.playerSequence.length;
                 db.ref(`rooms/${roomId}`).update({
-                    phase: 'PLAYING',
-                    players: newPlayers,
-                    playerSequence: playersLeft, // Remove dead players from sequence
-                    turnIndex: 0, // Simplified: Winner/Loser starts or just rotate. Let's reset to 0 of new sequence
-                    currentBid: null,
-                    lastAction: null
+                    currentBid: bid, turnIndex: nextTurn, lastAction: { type: 'BID', player: me.id }
                 });
+                Sounds.click();
             };
 
-            const placeBid = () => {
-                // Validation
-                const current = gameState.currentBid;
-                let valid = true;
-                if (current) {
-                     if (localBid.quantity < current.quantity) valid = false;
-                     if (localBid.quantity === current.quantity && localBid.value <= current.value) valid = false;
-                }
-
-                if (!valid) {
-                    playSound('error');
-                    setNotification("Bid must be HIGHER!");
-                    setTimeout(() => setNotification(null), 2000);
-                    return;
-                }
-
-                const nextTurn = (gameState.turnIndex + 1) % gameState.playerSequence.length;
-                db.ref(`rooms/${roomId}`).update({
-                    currentBid: { ...localBid, playerId: player.id },
-                    turnIndex: nextTurn,
-                    lastAction: { type: 'BID', playerId: player.id, bid: localBid }
-                });
-                playSound('click');
-            };
-
-            const callDudo = () => {
-                const bid = gameState.currentBid;
-                const allDice = Object.values(gameState.players).flatMap(p => p.dice);
-                // Wildcard logic: Aces (1) count unless bid is on Aces
-                const count = allDice.filter(d => d === bid.value || (bid.value !== 1 && d === 1)).length;
+            const callLiar = () => {
+                const curr = roomState.currentBid;
+                if (!curr) return;
                 
-                const success = count < bid.quantity; // Bidder lied!
-                const loserId = success ? bid.playerId : player.id;
+                // Calculate
+                const allDice = Object.values(roomState.players).flatMap(p => p.dice);
+                // Wildcard: 1s count unless bid is 1s
+                const count = allDice.filter(d => d === curr.v || (curr.v !== 1 && d === 1)).length;
+                const liarCaught = count < curr.q;
                 
-                const newPlayers = { ...gameState.players };
-                newPlayers[loserId].diceCount = Math.max(0, newPlayers[loserId].diceCount - 1);
+                const loserId = liarCaught ? curr.player : me.id;
+                const winnerId = liarCaught ? me.id : curr.player;
 
+                const updates = { ...roomState.players };
+                updates[loserId].diceCount--;
+                
                 db.ref(`rooms/${roomId}`).update({
                     phase: 'REVEALED',
-                    players: newPlayers,
-                    lastAction: { 
-                        type: 'DUDO', 
-                        caller: player.id, 
-                        bidder: bid.playerId, 
-                        success, 
-                        loserId,
-                        actualCount: count,
-                        bidWas: bid
+                    players: updates,
+                    lastResult: { 
+                        caller: me.id, 
+                        bidder: curr.player, 
+                        winner: winnerId, 
+                        loser: loserId,
+                        bid: curr,
+                        actual: count
                     }
+                });
+                Sounds.reveal();
+            };
+
+            const nextRound = () => {
+                const activeIds = roomState.playerSequence.filter(id => roomState.players[id].diceCount > 0);
+                if (activeIds.length < 2) {
+                     // Game Over
+                     return;
+                }
+                
+                const updates = { ...roomState.players };
+                Object.keys(updates).forEach(id => {
+                    if (updates[id].diceCount > 0) 
+                        updates[id].dice = Array.from({length: updates[id].diceCount}, () => Math.ceil(Math.random()*6));
+                    else 
+                        updates[id].dice = [];
+                });
+
+                // Loser starts? Or Winner? Let's just rotate
+                const nextTurn = (roomState.turnIndex + 1) % activeIds.length;
+
+                db.ref(`rooms/${roomId}`).update({
+                    phase: 'PLAYING',
+                    players: updates,
+                    playerSequence: activeIds,
+                    turnIndex: 0, 
+                    currentBid: null,
+                    lastResult: null
                 });
             };
 
-            // -- Render Helpers --
-            const me = gameState?.players?.[player.id];
-            const isMyTurn = gameState?.phase === 'PLAYING' && gameState.playerSequence[gameState.turnIndex] === player.id;
-
             // --- RENDER ---
-            
-            // 1. EDIT PROFILE SCREEN (Overlay)
-            if (isEditMode) {
-                 return React.createElement('div', { className: 'h-screen flex flex-col items-center justify-center space-y-6 p-4' },
-                    React.createElement('h2', { className: 'text-3xl casino-font text-yellow-400' }, 'EDIT PROFILE'),
-                    React.createElement('input', { 
-                        value: player.name, 
-                        onChange: e => setPlayer({...player, name: e.target.value.substring(0, 12)}),
-                        className: 'bg-slate-800 border-2 border-yellow-500 rounded-xl p-4 text-center text-2xl w-full max-w-xs',
-                        placeholder: 'Your Name'
-                    }),
-                    React.createElement('div', { className: 'grid grid-cols-5 gap-2' },
-                        AVATARS.map(av => React.createElement('button', {
-                            key: av,
-                            onClick: () => setPlayer({...player, avatar: av}),
-                            className: `text-3xl p-2 rounded-lg ${player.avatar === av ? 'bg-yellow-500' : 'bg-slate-700'}`
-                        }, av))
-                    ),
-                    React.createElement('button', { onClick: () => setIsEditMode(false), className: 'bg-green-600 px-8 py-3 rounded-full font-bold text-xl' }, 'SAVE')
-                 );
-            }
+            if (!roomState) return React.createElement('div', { className: 'h-screen flex flex-col items-center justify-center space-y-4' },
+                React.createElement('div', { className: 'text-6xl animate-bounce' }, '🎲'),
+                React.createElement('button', { onClick: join, className: 'bg-green-600 p-4 rounded-xl font-bold text-2xl' }, roomId ? 'JOIN GAME' : 'NEW GAME')
+            );
 
-            // 2. LOBBY SCREEN
-            if (!gameState) {
-                return React.createElement('div', { className: 'h-screen flex flex-col items-center justify-center p-6 space-y-8 text-center' },
-                    React.createElement('div', { className: 'animate-pulse' },
-                        React.createElement('h1', { className: 'text-7xl neon-text text-yellow-400 mb-2' }, 'LADODO'),
-                        React.createElement('div', { className: 'text-xl tracking-widest text-purple-300' }, 'CASINO EDITION')
-                    ),
-                    
-                    React.createElement('div', { 
-                        className: 'glass-panel p-4 rounded-2xl flex items-center space-x-4 cursor-pointer',
-                        onClick: () => setIsEditMode(true)
-                    },
-                        React.createElement('span', { className: 'text-4xl' }, player.avatar),
-                        React.createElement('div', { className: 'text-left' },
-                            React.createElement('div', { className: 'text-xs text-slate-400' }, 'PLAYING AS'),
-                            React.createElement('div', { className: 'font-bold text-xl' }, player.name)
-                        ),
-                        React.createElement('span', { className: 'text-slate-400' }, '✎')
-                    ),
+            const myData = roomState.players[me.id];
+            const isMyTurn = roomState.phase === 'PLAYING' && roomState.playerSequence[roomState.turnIndex] === me.id;
+            const totalDiceStart = Object.keys(roomState.players).length * 5;
+            const currentTotalDice = Object.values(roomState.players).reduce((acc, p) => acc + p.diceCount, 0);
+            const deadDiceCount = totalDiceStart - currentTotalDice;
 
-                    React.createElement('button', { onClick: createRoom, className: 'w-64 bg-gradient-to-r from-yellow-500 to-amber-600 p-4 rounded-full text-2xl font-bold shadow-lg transform active:scale-95 transition' }, 'CREATE ROOM'),
-                    
-                    React.createElement('div', { className: 'flex space-x-2 w-64' },
-                        React.createElement('input', { 
-                            value: roomId, 
-                            onChange: e => setRoomId(e.target.value.substring(0,4)),
-                            className: 'flex-1 bg-slate-800 text-center text-xl rounded-l-full border-y border-l border-slate-600',
-                            placeholder: 'CODE' 
-                        }),
-                        React.createElement('button', { onClick: () => joinRoom(), className: 'bg-green-600 px-6 rounded-r-full font-bold' }, 'JOIN')
+            // Editing Overlay
+            if (editing) return React.createElement('div', { className: 'fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center gap-6' },
+                React.createElement('h2', { className: 'text-2xl text-yellow-400' }, 'EDIT PROFILE'),
+                React.createElement('input', { value: me.name, onChange: e => updateMe({name: e.target.value}), className: 'bg-gray-800 p-3 text-center rounded text-xl' }),
+                React.createElement('div', { className: 'flex flex-wrap gap-2 justify-center max-w-xs' }, 
+                    ['😎','🤠','🤡','👻','🤖','👽','🎃','🦊'].map(ic => 
+                        React.createElement('button', { key: ic, onClick: () => updateMe({icon: ic}), className: `text-3xl p-2 rounded ${me.icon===ic?'bg-green-600':''}` }, ic)
                     )
-                );
-            }
-
-            // 3. GAME SCREEN
-            return React.createElement('div', { className: `h-screen flex flex-col relative ${screenShake ? 'shake-screen' : ''}` },
-                // Header
-                React.createElement('div', { className: 'flex justify-between items-center p-4 bg-black/30 backdrop-blur' },
-                    React.createElement('div', { className: 'flex flex-col' },
-                        React.createElement('span', { className: 'text-yellow-500 font-mono text-xs' }, 'ROOM CODE'),
-                        React.createElement('div', { className: 'text-2xl font-bold font-mono tracking-widest' }, roomId)
-                    ),
-                    React.createElement('button', { onClick: shareRoom, className: 'bg-blue-600/50 p-2 rounded-full text-sm' }, '🔗 SHARE'),
                 ),
+                React.createElement('button', { onClick: () => setEditing(false), className: 'text-4xl' }, '✅')
+            );
+
+            return React.createElement('div', { className: 'h-screen flex flex-col p-2 max-w-md mx-auto relative' },
                 
-                // Notification Overlay
-                notification && React.createElement('div', { className: 'absolute top-20 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full font-bold z-50 shadow-xl animate-bounce' }, notification),
-
-                // Main Table Area
-                React.createElement('div', { className: 'flex-1 relative flex flex-col items-center justify-center perspective-1000' },
-                    
-                    // Opponents (Top)
-                    React.createElement('div', { className: 'absolute top-4 w-full flex justify-center space-x-3 px-2 overflow-x-auto' },
-                        gameState.playerSequence.filter(pid => pid !== player.id).map(pid => {
-                            const p = gameState.players[pid];
-                            const isActive = gameState.phase === 'PLAYING' && gameState.playerSequence[gameState.turnIndex] === pid;
-                            return React.createElement('div', { key: pid, className: `flex flex-col items-center p-2 rounded-xl transition-all ${isActive ? 'active-player scale-110' : 'opacity-60 grayscale'}` },
-                                React.createElement('div', { className: 'text-2xl' }, p.avatar),
-                                React.createElement('div', { className: 'text-[10px] font-bold truncate max-w-[60px]' }, p.name),
-                                React.createElement('div', { className: 'flex space-x-0.5 mt-1' },
-                                    Array.from({ length: p.diceCount }).map((_, i) => React.createElement('div', { key: i, className: 'w-1.5 h-1.5 bg-yellow-400 rounded-full' }))
-                                )
-                            );
-                        })
-                    ),
-
-                    // Lobby Start Button
-                    gameState.phase === 'LOBBY' && React.createElement('div', { className: 'text-center space-y-4' },
-                        React.createElement('div', { className: 'text-4xl text-slate-300 font-light' }, 'WAITING FOR PLAYERS...'),
-                        React.createElement('div', { className: 'text-xl' }, `${gameState.playerSequence.length} JOINED`),
-                        gameState.hostId === player.id && React.createElement('button', { onClick: startGame, className: 'bg-green-500 text-black px-8 py-4 rounded-full text-2xl font-bold shadow-[0_0_20px_rgba(34,197,94,0.6)] animate-pulse' }, 'START GAME')
-                    ),
-
-                    // The Bid (Center)
-                    gameState.phase === 'PLAYING' && gameState.currentBid && React.createElement('div', { className: 'flex flex-col items-center bg-black/40 p-6 rounded-3xl border border-yellow-500/30' },
-                        React.createElement('div', { className: 'text-xs text-yellow-500 uppercase tracking-widest mb-2' }, 'CURRENT BID'),
-                        React.createElement('div', { className: 'flex items-center space-x-4' },
-                            React.createElement('span', { className: 'text-7xl font-bold text-white' }, gameState.currentBid.quantity),
-                            React.createElement('span', { className: 'text-4xl text-slate-400' }, 'x'),
-                            React.createElement(DiceIcon, { value: gameState.currentBid.value, size: 70 })
-                        ),
-                        React.createElement('div', { className: 'mt-2 text-sm text-slate-400' }, `By ${gameState.players[gameState.currentBid.playerId]?.name}`)
-                    ),
-
-                    // Revelation / End Round (Center)
-                    gameState.phase === 'REVEALED' && gameState.lastAction && React.createElement('div', { className: 'text-center bg-black/80 p-6 rounded-3xl z-20 border-2 border-red-500 w-11/12' },
-                        React.createElement('h2', { className: 'text-3xl font-black text-red-500 mb-4' }, 'DUDO CALLED!'),
-                        React.createElement('div', { className: 'text-xl mb-4' }, 
-                            React.createElement('span', { className: 'text-yellow-400' }, gameState.players[gameState.lastAction.caller].name),
-                            ' called liar on ',
-                            React.createElement('span', { className: 'text-blue-400' }, gameState.players[gameState.lastAction.bidder].name)
-                        ),
-                        React.createElement('div', { className: 'flex flex-wrap justify-center gap-2 mb-6' },
-                            Object.entries(gameState.players).map(([pid, p]) => 
-                                p.dice.map((d, i) => React.createElement('div', { key: pid+i, className: gameState.lastAction.bidWas.value === d || d === 1 ? 'opacity-100 scale-110' : 'opacity-40 grayscale' }, 
-                                    React.createElement(DiceIcon, { value: d, size: 35 })
-                                ))
-                            )
-                        ),
-                        React.createElement('div', { className: 'text-2xl font-bold' }, 
-                            `Total ${gameState.lastAction.bidWas.value}'s (and Aces): `,
-                            React.createElement('span', { className: 'text-yellow-500 text-4xl' }, gameState.lastAction.actualCount)
-                        ),
-                        React.createElement('div', { className: 'mt-4 text-sm text-slate-400 animate-pulse' }, 'NEXT ROUND STARTING AUTOMATICALLY...')
-                    ),
-
-                     // Winner Screen
-                     gameState.phase === 'WON' && React.createElement('div', { className: 'text-center z-50' },
-                        React.createElement('div', { className: 'text-8xl mb-4' }, '🏆'),
-                        React.createElement('h1', { className: 'text-5xl font-black text-yellow-400 mb-2' }, gameState.players[gameState.winnerId].name),
-                        React.createElement('div', { className: 'text-2xl text-white' }, 'IS THE MASTER OF DICE!'),
-                        gameState.hostId === player.id && React.createElement('button', { onClick: startGame, className: 'mt-8 bg-white text-black px-6 py-3 rounded-full font-bold' }, 'NEW GAME')
-                    )
+                // 1. TOP: Opponents
+                React.createElement('div', { className: 'flex justify-center gap-2 mb-4' },
+                    roomState.playerSequence.filter(id => id !== me.id).map(id => {
+                        const p = roomState.players[id];
+                        const res = roomState.lastResult;
+                        let state = '';
+                        if (roomState.phase === 'REVEALED' && res) {
+                            if (res.winner === id) state = 'win';
+                            if (res.loser === id) state = 'lose';
+                        }
+                        return React.createElement(Avatar, { 
+                            key: id, 
+                            icon: p.icon, 
+                            name: p.name, 
+                            diceCount: p.diceCount, 
+                            isActive: roomState.phase === 'PLAYING' && roomState.playerSequence[roomState.turnIndex] === id,
+                            state: state
+                        });
+                    })
                 ),
 
-                // Controls (Bottom)
-                React.createElement('div', { className: 'mt-auto' },
+                // 2. CENTER: Table / Action / Graveyard
+                React.createElement('div', { className: 'flex-1 flex flex-col items-center justify-center relative' },
                     
-                    // My Controls
-                    isMyTurn && !cupOpen && React.createElement('div', { className: 'bg-slate-900/90 p-4 rounded-t-3xl border-t border-yellow-500/50 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] animation-slide-up' },
-                        React.createElement('div', { className: 'flex justify-center items-center space-x-6 mb-4' },
-                            React.createElement('div', { className: 'flex items-center space-x-2 bg-slate-800 rounded-full p-1' },
-                                React.createElement('button', { onClick: () => setLocalBid(b => ({...b, quantity: Math.max(1, b.quantity-1)})), className: 'w-10 h-10 rounded-full bg-slate-700 text-xl font-bold' }, '-'),
-                                React.createElement('span', { className: 'text-3xl font-bold w-8 text-center' }, localBid?.quantity || 1),
-                                React.createElement('button', { onClick: () => setLocalBid(b => ({...b, quantity: b.quantity+1})), className: 'w-10 h-10 rounded-full bg-slate-700 text-xl font-bold' }, '+')
-                            ),
-                            React.createElement('div', { className: 'flex items-center space-x-2 bg-slate-800 rounded-full p-1' },
-                                React.createElement('button', { onClick: () => setLocalBid(b => ({...b, value: b.value === 1 ? 6 : b.value-1})), className: 'w-10 h-10 rounded-full bg-slate-700 text-xl font-bold' }, '<'),
-                                React.createElement(DiceIcon, { value: localBid?.value || 2, size: 40 }),
-                                React.createElement('button', { onClick: () => setLocalBid(b => ({...b, value: b.value === 6 ? 1 : b.value+1})), className: 'w-10 h-10 rounded-full bg-slate-700 text-xl font-bold' }, '>')
-                            )
-                        ),
-                        React.createElement('div', { className: 'flex space-x-3' },
-                            gameState.currentBid && React.createElement('button', { onClick: callDudo, className: 'flex-1 bg-gradient-to-br from-red-600 to-red-800 py-4 rounded-2xl font-black text-xl shadow-lg border-b-4 border-red-900 active:border-b-0 active:translate-y-1 transition' }, 'DUDO!'),
-                            React.createElement('button', { onClick: placeBid, className: 'flex-[2] bg-gradient-to-br from-green-500 to-green-700 py-4 rounded-2xl font-black text-xl shadow-lg border-b-4 border-green-900 active:border-b-0 active:translate-y-1 transition' }, 'BET')
+                    // Graveyard (Dead Dice)
+                    React.createElement('div', { className: 'absolute top-0 right-0 opacity-50 flex flex-col items-center' },
+                        React.createElement('span', { className: 'text-xs uppercase tracking-widest' }, 'Lost Dice'),
+                        React.createElement('div', { className: 'flex items-center text-gray-500' },
+                            React.createElement('span', { className: 'text-2xl font-bold mr-1' }, deadDiceCount),
+                            React.createElement('span', { className: 'text-xl' }, '💀')
                         )
                     ),
 
-                    // My Dice (Cup)
-                    gameState.phase !== 'LOBBY' && me?.diceCount > 0 && React.createElement('div', { className: 'relative h-24 flex justify-center items-end pb-2' },
+                    // Lobby Phase
+                    roomState.phase === 'LOBBY' && React.createElement('div', { className: 'text-center' },
+                        React.createElement('div', { className: 'text-4xl mb-4 animate-pulse' }, '⏳'),
+                        React.createElement('button', { onClick: startGame, className: 'bg-green-600 w-20 h-20 rounded-full text-4xl shadow-lg' }, '▶')
+                    ),
+
+                    // Playing Phase: Current Bid
+                    roomState.phase === 'PLAYING' && roomState.currentBid && React.createElement('div', { className: 'flex items-center gap-4 bg-gray-800/80 p-6 rounded-2xl border border-gray-600' },
+                        React.createElement('span', { className: 'text-6xl font-black text-yellow-400' }, roomState.currentBid.q),
+                        React.createElement('span', { className: 'text-2xl text-gray-400' }, 'x'),
+                        React.createElement(Dice, { val: roomState.currentBid.v, size: 60 })
+                    ),
+
+                    // Revealed Phase: Results
+                    roomState.phase === 'REVEALED' && React.createElement('div', { className: 'w-full grid grid-cols-3 gap-2 overflow-y-auto max-h-64 p-2 bg-black/40 rounded-xl' },
+                        Object.values(roomState.players).map(p => 
+                            p.dice.map((d, i) => {
+                                const isRelevant = roomState.lastResult.bid.v === d || d === 1;
+                                return React.createElement('div', { key: p.id+i, className: 'flex justify-center' },
+                                    React.createElement(Dice, { val: d, size: 30, highlight: isRelevant })
+                                );
+                            })
+                        )
+                    ),
+
+                    // Next Round Button (Manual)
+                    roomState.phase === 'REVEALED' && React.createElement('button', { 
+                        onClick: nextRound, 
+                        className: 'absolute bottom-10 z-50 bg-green-500 text-black w-16 h-16 rounded-full text-3xl shadow-[0_0_20px_white] animate-bounce flex items-center justify-center' 
+                    }, '▶')
+                ),
+
+                // 3. BOTTOM: My Area (Stacked)
+                React.createElement('div', { className: 'mt-auto flex flex-col gap-2' },
+                    
+                    // A. My Avatar & Edit (Floating small)
+                    React.createElement('div', { 
+                        onClick: () => setEditing(true),
+                        className: `self-center flex items-center gap-2 bg-gray-800 px-3 py-1 rounded-full text-sm cursor-pointer border border-gray-600 ${roomState.lastResult?.loser === me.id && roomState.phase === 'REVEALED' ? 'loser-anim bg-red-900' : ''} ${roomState.lastResult?.winner === me.id && roomState.phase === 'REVEALED' ? 'winner-anim bg-green-900' : ''}` 
+                    },
+                        React.createElement('span', null, me.icon),
+                        React.createElement('span', { className: 'font-bold' }, me.name),
+                        React.createElement('span', { className: 'text-gray-400 text-xs' }, '✏️')
+                    ),
+
+                    // B. My Dice (Always Visible Row)
+                    myData?.diceCount > 0 && React.createElement('div', { className: 'glass p-3 rounded-xl flex justify-center gap-3 min-h-[60px]' },
                         cupOpen 
-                        ? React.createElement('div', { className: 'absolute bottom-20 bg-slate-800/90 p-4 rounded-2xl border-2 border-yellow-500 shadow-2xl flex gap-2 animate-bounce cursor-pointer', onClick: () => setCupOpen(false) },
-                            me.dice.map((d, i) => React.createElement(DiceIcon, { key: i, value: d, size: 45 }))
-                          )
-                        : null,
-                        
-                        React.createElement('button', { 
-                            onClick: () => { 
-                                playSound('click');
-                                setCupOpen(!cupOpen); 
-                            }, 
-                            className: `relative transition-transform active:scale-95 ${shaking ? 'shake-element' : ''}` 
-                        },
-                            React.createElement('div', { className: 'text-6xl filter drop-shadow-lg' }, '🥤'),
-                            !cupOpen && React.createElement('div', { className: 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold border-2 border-black' }, me.diceCount)
+                        ? myData.dice.map((d, i) => React.createElement(Dice, { key: i, val: d, size: 45 })) 
+                        : React.createElement('span', { className: 'text-4xl cursor-pointer', onClick: ()=>setCupOpen(true) }, '🔒')
+                    ),
+
+                    // C. Controls (Only when my turn)
+                    isMyTurn && React.createElement('div', { className: 'bg-gray-900 p-3 rounded-t-3xl border-t border-yellow-500 flex flex-col gap-3' },
+                        // Bid Selectors
+                        React.createElement('div', { className: 'flex justify-between items-center px-2' },
+                            // Quantity
+                            React.createElement('div', { className: 'flex items-center gap-2 bg-gray-800 rounded-lg p-1' },
+                                React.createElement('button', { onClick: () => setBid(b=>({...b, q: Math.max(1, b.q-1)})), className: 'w-10 h-10 bg-gray-700 rounded text-xl' }, '-'),
+                                React.createElement('span', { className: 'text-3xl font-bold w-8 text-center' }, bid.q),
+                                React.createElement('button', { onClick: () => setBid(b=>({...b, q: b.q+1})), className: 'w-10 h-10 bg-gray-700 rounded text-xl' }, '+')
+                            ),
+                            // Value
+                            React.createElement('div', { className: 'flex items-center gap-2 bg-gray-800 rounded-lg p-1' },
+                                React.createElement('button', { onClick: () => setBid(b=>({...b, v: b.v===1?6:b.v-1})), className: 'w-10 h-10 bg-gray-700 rounded text-xl' }, '<'),
+                                React.createElement(Dice, { val: bid.v, size: 35 }),
+                                React.createElement('button', { onClick: () => setBid(b=>({...b, v: b.v===6?1:b.v+1})), className: 'w-10 h-10 bg-gray-700 rounded text-xl' }, '>')
+                            )
+                        ),
+                        // Action Buttons
+                        React.createElement('div', { className: 'flex gap-3 h-16' },
+                            // Dudo / Liar
+                            roomState.currentBid && React.createElement('button', { 
+                                onClick: callLiar, 
+                                className: 'flex-1 bg-red-600 rounded-xl text-3xl font-black shadow-lg active:scale-95 transition-transform' 
+                            }, '?!'),
+                            // Bet
+                            React.createElement('button', { 
+                                onClick: submitBid, 
+                                className: 'flex-[2] bg-green-600 rounded-xl text-4xl font-black shadow-lg active:scale-95 transition-transform' 
+                            }, '✓')
                         )
                     )
                 )
