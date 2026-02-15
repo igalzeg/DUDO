@@ -545,48 +545,48 @@ const Glitters = ({ active, color='#ffd700' }) => {
 };
 
 // ─────────────────────────────────────────
-// MINI PLAYER CARD (Opponents)
+// PLAYER CARD (clean: avatar + name + dice dots)
 // ─────────────────────────────────────────
-const OpponentCard = ({ player, isActive, resultState, onEditName, isMe }) => {
+const PlayerCard = ({ player, isActive, resultState, onEditName, isMe }) => {
     const [editing, setEditing] = useState(false);
     const [tempName, setTempName] = useState(player.name);
-
-    const handleNameSave = () => {
+    const handleSave = () => {
         setEditing(false);
-        onEditName && onEditName(tempName.substring(0,12) || player.name);
+        const n = tempName.trim().substring(0,12);
+        onEditName && onEditName(n || player.name);
     };
-
+    const borderColor = isActive ? '#ffd700' : (resultState === 'won' ? '#00e676' : (resultState === 'lost' ? '#ff3b3b' : 'rgba(255,255,255,0.12)'));
+    const bg = isActive ? 'rgba(255,215,0,0.08)' : (resultState === 'won' ? 'rgba(0,230,118,0.08)' : (resultState === 'lost' ? 'rgba(255,59,59,0.08)' : 'rgba(0,0,0,0.35)'));
     return React.createElement('div', {
-        className: `player-card ${isActive?'active':''} ${resultState==='lost'?'lost-die':''} ${resultState==='won'?'won-call':''}`,
-        style: { padding:'8px 10px', minWidth:68, textAlign:'center', position:'relative', cursor: isMe ? 'pointer' : 'default' }
+        style:{ border:`2px solid ${borderColor}`, background:bg, borderRadius:14, padding:'8px 10px',
+            textAlign:'center', minWidth:64, maxWidth:80, transition:'all 0.3s',
+            transform: isActive ? 'scale(1.08)' : 'scale(1)',
+            boxShadow: isActive ? '0 0 12px rgba(255,215,0,0.4)' : 'none', position:'relative' }
     },
-        React.createElement(Glitters, { active: resultState==='won', color:'#00e676' }),
-        React.createElement(Glitters, { active: resultState==='lost', color:'#ff3b3b' }),
-        React.createElement('div', { style:{fontSize:28, lineHeight:1} }, player.avatar),
-        editing
-            ? React.createElement('input', {
-                className:'name-edit-input',
-                value:tempName,
-                onChange:e=>setTempName(e.target.value.substring(0,12)),
-                onBlur:handleNameSave,
-                onKeyDown:e=>{ if(e.key==='Enter') handleNameSave(); if(e.key==='Escape'){ setEditing(false); setTempName(player.name); } },
-                autoFocus: true,
-                style:{fontSize:'0.75rem', width:70}
-            })
-            : React.createElement('div', {
-                style:{fontSize:'0.72rem', fontWeight:'bold', maxWidth:70, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', cursor: isMe ? 'text' : 'default'},
-                onClick: isMe ? () => setEditing(true) : undefined
-            },
-                player.name,
-                isMe && React.createElement('span', { style:{opacity:0.5, marginLeft:3, fontSize:'0.6rem'} }, '✎')
-            ),
-        React.createElement('div', { style:{display:'flex', justifyContent:'center', gap:2, marginTop:4, flexWrap:'wrap', maxWidth:70} },
-            Array.from({length: player.diceCount}).map((_,i) =>
-                React.createElement('div', { key:i, className:'mini-die' })
+        resultState === 'won' && React.createElement(Glitters, { active:true, color:'#00e676' }),
+        resultState === 'lost' && React.createElement(Glitters, { active:true, color:'#ff3b3b' }),
+        React.createElement('div', { style:{fontSize:28, lineHeight:1, marginBottom:3} }, player.avatar),
+        editing ? React.createElement('input', {
+            style:{ background:'transparent', border:'none', borderBottom:'2px solid #ffd700', color:'white',
+                fontFamily:"'Fredoka One', cursive", fontSize:'0.75rem', textAlign:'center', outline:'none', width:64 },
+            value:tempName, onChange:e=>setTempName(e.target.value.substring(0,12)),
+            onBlur:handleSave,
+            onKeyDown:e=>{ if(e.key==='Enter') handleSave(); if(e.key==='Escape'){ setEditing(false); setTempName(player.name); } },
+            autoFocus:true
+        }) : React.createElement('div', {
+            style:{ fontSize:'0.72rem', color: isMe ? '#ffd700' : 'rgba(255,255,255,0.85)',
+                overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:72, margin:'0 auto',
+                cursor: isMe ? 'pointer' : 'default' },
+            onClick: isMe ? ()=>{ setTempName(player.name); setEditing(true); } : undefined
+        }, player.name, isMe && React.createElement('span', { style:{opacity:0.5, marginLeft:2, fontSize:'0.6rem'} }, '✎')),
+        React.createElement('div', { style:{display:'flex', justifyContent:'center', gap:3, marginTop:5, flexWrap:'wrap', maxWidth:72, margin:'5px auto 0'} },
+            Array.from({length: player.diceCount||0}).map((_,i) =>
+                React.createElement('div', { key:i, style:{width:10, height:10, borderRadius:3, background:'#ffd700', boxShadow:'0 1px 3px rgba(0,0,0,0.5)'} })
             )
         )
     );
 };
+
 
 // ─────────────────────────────────────────
 // DICE PILE (lost dice)
@@ -759,8 +759,6 @@ const App = () => {
     const [roomId, setRoomId] = useState('');
     const [roomInput, setRoomInput] = useState('');
     const [localBid, setLocalBid] = useState({ quantity:1, value:2 });
-    const [cupOpen, setCupOpen] = useState(false);
-    const [cupRolling, setCupRolling] = useState(false);
     const [flashScreen, setFlashScreen] = useState(false);
     const [notification, setNotification] = useState(null);
     const [editingName, setEditingName] = useState(false);
@@ -781,13 +779,31 @@ const App = () => {
         }
     }, [player]);
 
-    // Auto-join from URL
+    // Auto-join from URL - must run once on mount, pass code directly
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const code = params.get('room');
         if (code && code.length === 4) {
             setRoomInput(code);
-            doJoin(code);
+            // Call Firebase directly here to avoid stale closure issues
+            db.ref(`rooms/${code}`).transaction(room => {
+                if (!room) return;
+                const pid = player.id;
+                if (!room.players[pid]) {
+                    const existing = Object.values(room.players);
+                    const minDice = room.phase === 'PLAYING' ? Math.min(...existing.map(p=>p.diceCount)) : 5;
+                    room.players[pid] = {...player, diceCount:minDice, dice:[]};
+                    room.playerSequence = room.playerSequence || [];
+                    if (!room.playerSequence.includes(pid)) room.playerSequence.push(pid);
+                }
+                return room;
+            }, (err, committed, snap) => {
+                if (snap && snap.val()) {
+                    setRoomId(code);
+                    setGameState(snap.val());
+                    AudioEngine.click();
+                }
+            });
         }
     }, []);
 
@@ -808,17 +824,12 @@ const App = () => {
                 setTimeout(()=>setFlashScreen(false), 600);
                 setShowResult(true);
                 setResultAck(false);
-                setCupOpen(false);
             }
 
             if (val.phase === 'PLAYING' && prev === 'REVEALED') {
                 setShowResult(false);
                 setResultAck(false);
-                // Roll cup animation
-                setCupRolling(true);
                 AudioEngine.shake();
-                setTimeout(()=>setCupRolling(false), 900);
-                setCupOpen(false);
             }
 
             if (val.phase === 'WON' && prev !== 'WON') {
@@ -862,30 +873,32 @@ const App = () => {
         window.history.pushState({}, '', `?room=${code}`);
     };
 
-    const doJoin = useCallback((code=roomInput) => {
-        if (!code || code.length !== 4) return;
-        db.ref(`rooms/${code}`).transaction(room => {
-            if (!room) return;
+    const doJoin = (code) => {
+        const c = (code || roomInput || '').toString().trim();
+        if (!c || c.length !== 4) return;
+        db.ref(`rooms/${c}`).transaction(room => {
+            if (!room) return room; // abort if room doesn't exist
             if (!room.players[player.id]) {
                 const existing = Object.values(room.players);
                 const minDice = room.phase === 'PLAYING' ? Math.min(...existing.map(p=>p.diceCount)) : 5;
                 room.players[player.id] = {...player, diceCount:minDice, dice:[]};
                 room.playerSequence = room.playerSequence || [];
-                room.playerSequence.push(player.id);
+                if (!room.playerSequence.includes(player.id)) room.playerSequence.push(player.id);
             }
             return room;
         }, (err, committed, snap) => {
-            if (committed && snap) {
-                setRoomId(code);
-                setGameState(snap.val());
+            const val = snap && snap.val();
+            if (val) {
+                setRoomId(c);
+                setGameState(val);
                 AudioEngine.click();
-                window.history.pushState({}, '', `?room=${code}`);
+                window.history.pushState({}, '', `?room=${c}`);
             } else {
                 setNotification('❌');
                 setTimeout(()=>setNotification(null), 2000);
             }
         });
-    }, [player, roomInput]);
+    };
 
     const doShare = () => {
         const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
@@ -903,9 +916,7 @@ const App = () => {
         db.ref(`rooms/${roomId}`).update({
             phase:'PLAYING', players:newPlayers, currentBid:null, turnIndex:0, lastAction:null
         });
-        setCupRolling(true);
         AudioEngine.shake();
-        setTimeout(()=>setCupRolling(false), 900);
     };
 
     const doNextRound = () => {
@@ -1198,14 +1209,14 @@ const App = () => {
                 opponents.map(pid => {
                     const p = gameState.players[pid];
                     const isActive = activePlayerId === pid && gameState.phase === 'PLAYING';
-                    return React.createElement(OpponentCard, {
+                    return React.createElement(PlayerCard, {
                         key:pid, player:p, isActive,
                         resultState: getResultState(pid),
                         isMe: false
                     });
                 }),
-                // ME as opponent card too (in opponents view)
-                me && React.createElement(OpponentCard, {
+                // ME as card too
+                me && React.createElement(PlayerCard, {
                     key:player.id+'self', player:{...me, name:player.name, avatar:player.avatar},
                     isActive: activePlayerId === player.id && gameState.phase === 'PLAYING',
                     resultState: getResultState(player.id),
@@ -1246,43 +1257,42 @@ const App = () => {
         // ── BOTTOM CONTROLS ──
         React.createElement('div', { style:{flexShrink:0} },
 
-            // ── BET CONTROLS (only my turn, not revealed) ──
+            // ── BET CONTROLS (only my turn) ──
             isMyTurn && gameState.phase === 'PLAYING' &&
-            React.createElement('div', { className:'controls-panel', style:{padding:'12px 14px 8px'} },
-                // Bid selector + Cup on same line
-                React.createElement('div', { style:{display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginBottom:10} },
-                    // Quantity control
+            React.createElement('div', { className:'controls-panel', style:{padding:'12px 14px 10px'} },
+                // Bid row: [−] quantity [+]  ×  [‹] dice [›]
+                React.createElement('div', { style:{display:'flex', alignItems:'center', justifyContent:'center', gap:12, marginBottom:10} },
+                    // Quantity: − left, number, + right
                     React.createElement('div', { style:{display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.07)', borderRadius:14, padding:'6px 10px'} },
                         React.createElement('button', {
-                            style:{width:32, height:32, borderRadius:'50%', background:'rgba(255,255,255,0.12)', border:'none', color:'white', fontSize:'1.2rem', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center'},
+                            style:{width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', color:'white', fontSize:'1.3rem', cursor:'pointer'},
                             onClick:()=>setLocalBid(b=>({...b, quantity:Math.max(1,b.quantity-1)}))
                         }, '−'),
-                        React.createElement('span', { style:{fontSize:'1.8rem', fontWeight:'bold', minWidth:32, textAlign:'center'} }, localBid.quantity),
+                        React.createElement('span', { style:{fontSize:'2rem', fontWeight:'bold', minWidth:36, textAlign:'center'} }, localBid.quantity),
                         React.createElement('button', {
-                            style:{width:32, height:32, borderRadius:'50%', background:'rgba(255,255,255,0.12)', border:'none', color:'white', fontSize:'1.2rem', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center'},
+                            style:{width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', color:'white', fontSize:'1.3rem', cursor:'pointer'},
                             onClick:()=>setLocalBid(b=>({...b, quantity:b.quantity+1}))
                         }, '+')
                     ),
-                    React.createElement('span', { style:{fontSize:'1.4rem', opacity:0.4} }, '×'),
-                    // Dice value control
+                    React.createElement('span', { style:{fontSize:'1.3rem', opacity:0.35} }, '×'),
+                    // Dice face: ‹ left, dice, › right
                     React.createElement('div', { style:{display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.07)', borderRadius:14, padding:'6px 10px'} },
                         React.createElement('button', {
-                            style:{width:32, height:32, borderRadius:'50%', background:'rgba(255,255,255,0.12)', border:'none', color:'white', fontSize:'1.2rem', cursor:'pointer'},
+                            style:{width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', color:'white', fontSize:'1.3rem', cursor:'pointer'},
                             onClick:()=>setLocalBid(b=>({...b, value:b.value===1?6:b.value-1}))
                         }, '‹'),
-                        React.createElement(DiceIcon, { value:localBid.value, size:40 }),
+                        React.createElement(DiceIcon, { value:localBid.value, size:42 }),
                         React.createElement('button', {
-                            style:{width:32, height:32, borderRadius:'50%', background:'rgba(255,255,255,0.12)', border:'none', color:'white', fontSize:'1.2rem', cursor:'pointer'},
+                            style:{width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', border:'none', color:'white', fontSize:'1.3rem', cursor:'pointer'},
                             onClick:()=>setLocalBid(b=>({...b, value:b.value===6?1:b.value+1}))
                         }, '›')
-                    ),
-                    // Cup (same row!)
-                    React.createElement(CupWithDice, {
-                        isRolling:cupRolling, diceCount:me?.diceCount||0,
-                        dice:me?.dice||[],
-                        open:cupOpen,
-                        onClick:()=>{ AudioEngine.click(); setCupOpen(x=>!x); }
-                    })
+                    )
+                ),
+                // My dice — shown inline, no cup
+                me?.dice?.length > 0 && React.createElement('div', {
+                    style:{display:'flex', justifyContent:'center', gap:6, marginBottom:10}
+                },
+                    me.dice.map((d,i) => React.createElement(DiceIcon, { key:i, value:d, size:36 }))
                 ),
                 // Action buttons
                 React.createElement('div', { style:{display:'flex', gap:8} },
@@ -1291,33 +1301,29 @@ const App = () => {
                         style:{
                             flex:1, padding:'13px 0', borderRadius:16, border:'3px solid #ff3b3b',
                             background:'linear-gradient(135deg, #7a0000, #cc0000)',
-                            color:'white', fontSize:'1.4rem', cursor:'pointer',
+                            color:'white', fontSize:'1.5rem', cursor:'pointer',
                             fontFamily:"'Fredoka One', cursive",
-                            boxShadow:'0 0 16px rgba(255,59,59,0.4)',
-                            transition:'transform 0.1s'
+                            boxShadow:'0 0 16px rgba(255,59,59,0.4)'
                         }
                     }, '🚨'),
                     React.createElement('button', {
                         onClick:doPlaceBid,
                         className:'btn-gold',
-                        style:{flex:2, padding:'13px 0', fontSize:'1.4rem', borderRadius:16}
+                        style:{flex:2, padding:'13px 0', fontSize:'1.5rem', borderRadius:16}
                     }, '🎯')
                 )
             ),
 
-            // ── CUP ONLY (not my turn) ──
-            gameState.phase === 'PLAYING' && !isMyTurn && me?.diceCount > 0 &&
-            React.createElement('div', { style:{padding:'8px 14px 12px', display:'flex', justifyContent:'center'} },
-                React.createElement(CupWithDice, {
-                    isRolling:cupRolling, diceCount:me?.diceCount||0,
-                    dice:me?.dice||[],
-                    open:cupOpen,
-                    onClick:()=>{ AudioEngine.click(); setCupOpen(x=>!x); }
-                })
+            // ── NOT MY TURN: show my dice only ──
+            gameState.phase === 'PLAYING' && !isMyTurn && me?.dice?.length > 0 &&
+            React.createElement('div', {
+                style:{padding:'10px 14px 12px', display:'flex', justifyContent:'center', gap:6,
+                    background:'rgba(0,0,0,0.3)', borderTop:'1px solid rgba(255,255,255,0.08)'}
+            },
+                me.dice.map((d,i) => React.createElement(DiceIcon, { key:i, value:d, size:38 }))
             ),
 
-            // LOBBY cup
-            gameState.phase === 'LOBBY' && React.createElement('div', { style:{height:16} })
+            gameState.phase === 'LOBBY' && React.createElement('div', { style:{height:12} })
         ),
 
         // Notification toast
