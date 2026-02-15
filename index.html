@@ -13,75 +13,65 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Goldman:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Arimo:wght@700&display=swap');
         
         body { 
             background: radial-gradient(circle at center, #065f46 0%, #064e3b 40%, #022c22 100%);
-            color: white; user-select: none; font-family: 'Goldman', cursive; 
+            color: white; user-select: none; font-family: 'Arimo', sans-serif;
             overflow: hidden; touch-action: manipulation;
         }
 
         .casino-felt {
-            background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
-            background-size: 30px 30px;
+            background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
         }
 
         @keyframes shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-1px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            100% { transform: translate(1px, 1px) rotate(0deg); }
+            0% { transform: translate(2px, 2px) rotate(0deg); }
+            20% { transform: translate(-2px, -3px) rotate(-2deg); }
+            40% { transform: translate(-4px, 1px) rotate(2deg); }
+            60% { transform: translate(4px, 2px) rotate(-1deg); }
+            80% { transform: translate(-1px, -2px) rotate(1deg); }
+            100% { transform: translate(2px, 2px) rotate(0deg); }
         }
-        .shake-cup { animation: shake 0.2s infinite; }
+        .shake-cup { animation: shake 0.15s infinite; }
 
         @keyframes fly-to-pile {
-            0% { transform: scale(1) translate(0,0); opacity: 1; }
-            100% { transform: scale(0.5) translate(var(--tw-translate-x), var(--tw-translate-y)); opacity: 0.5; }
+            0% { transform: scale(1.5) rotate(0deg); opacity: 1; }
+            100% { transform: scale(0.3) translate(0, -500px) rotate(360deg); opacity: 0; }
         }
-        .flying-die { animation: fly-to-pile 1s forwards ease-in; }
+        .losing-die-anim { animation: fly-to-pile 1s forwards ease-in; }
 
-        .gold-glow { box-shadow: 0 0 20px rgba(234, 179, 8, 0.4); border: 2px solid #eab308; }
-        .green-glow { box-shadow: 0 0 25px rgba(34, 197, 94, 0.8); border: 3px solid #22c55e; }
+        .gold-glow { box-shadow: 0 0 25px rgba(234, 179, 8, 0.6); border: 3px solid #eab308; }
+        .win-glow { box-shadow: 0 0 35px #22c55e; border: 4px solid #22c55e; transform: scale(1.2); }
         
-        .dice-card { background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%); }
+        .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .btn-shadow { box-shadow: 0 6px 0 rgba(0,0,0,0.3); transition: all 0.1s; }
+        .btn-shadow:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
     </style>
 </head>
 <body class="casino-felt">
     <div id="root"></div>
 
     <script>
-        // --- AUDIO ENGINE ---
-        const playSound = (type) => {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain); gain.connect(ctx.destination);
-            const now = ctx.currentTime;
-
-            if (type === 'shake') {
-                osc.type = 'square'; osc.frequency.setValueAtTime(100, now);
-                osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
-                gain.gain.setValueAtTime(0.05, now);
-                osc.start(); osc.stop(now + 0.1);
-            } else if (type === 'win') {
-                [440, 554, 659].forEach((f, i) => {
-                    const o = ctx.createOscillator();
-                    o.connect(gain); o.frequency.setValueAtTime(f, now + i*0.1);
-                    o.start(now + i*0.1); o.stop(now + 0.5);
-                });
-                gain.gain.setValueAtTime(0.1, now);
-            } else if (type === 'lose') {
-                osc.frequency.setValueAtTime(200, now);
-                osc.frequency.linearRampToValueAtTime(50, now + 0.5);
-                gain.gain.setValueAtTime(0.1, now);
-                osc.start(); osc.stop(now + 0.5);
-            }
+        // --- AUDIO ENGINE (Safe Version) ---
+        let audioCtx = null;
+        const initAudio = () => { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); };
+        
+        const playSound = (freq, type = 'sine', duration = 0.2) => {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
         };
 
-        // --- FIREBASE CONFIG ---
+        // --- FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyCUvDUDrj1MofAFRYeDrGP7OoIz0qX0iW8",
             authDomain: "dudogame-44b81.firebaseapp.com",
@@ -91,7 +81,8 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo } = React;
+        const e = React.createElement;
         const AVATARS = ['🎩', '💎', '💰', '🎰', '🦁', '👑', '🃏', '🍷', '💵', '🎲'];
 
         const DiceIcon = ({ value, size = 40, highlight = false, className = "" }) => {
@@ -101,21 +92,22 @@
                 5: [[25, 25], [25, 75], [50, 50], [75, 25], [75, 75]],
                 6: [[25, 25], [25, 50], [25, 75], [75, 25], [75, 50], [75, 75]]
             };
-            return React.createElement('svg', { 
+            return e('svg', { 
                 width: size, height: size, viewBox: '0 0 100 100', 
-                className: `dice-shadow transition-all ${highlight ? 'green-glow scale-125 animate-pulse' : ''} ${className}` 
+                className: `transition-all ${highlight ? 'win-glow' : ''} ${className}`,
+                style: { filter: 'drop-shadow(0 4px 4px rgba(0,0,0,0.4))' }
             },
-                React.createElement('rect', { x: 5, y: 5, width: 90, height: 90, rx: 18, fill: value === 1 ? '#dc2626' : 'white' }),
-                dots[value]?.map(([cx, cy], i) => React.createElement('circle', { key: i, cx, cy, r: 8, fill: value === 1 ? 'white' : 'black' }))
+                e('rect', { x: 5, y: 5, width: 90, height: 90, rx: 18, fill: value === 1 ? '#ef4444' : 'white' }),
+                dots[value]?.map(([cx, cy], i) => e('circle', { key: i, cx, cy, r: 8, fill: value === 1 ? 'white' : 'black' }))
             );
         };
 
         const App = () => {
             const [player, setPlayer] = useState(() => {
-                const saved = JSON.parse(sessionStorage.getItem('ladodo_v3') || '{}');
+                const saved = JSON.parse(sessionStorage.getItem('ladodo_v4') || '{}');
                 return {
                     id: saved.id || Math.random().toString(36).substring(2, 9),
-                    name: saved.name || 'GUEST',
+                    name: saved.name || 'שחקן',
                     avatar: saved.avatar || AVATARS[0]
                 };
             });
@@ -126,29 +118,34 @@
             const [isShaking, setIsShaking] = useState(false);
 
             useEffect(() => {
-                sessionStorage.setItem('ladodo_v3', JSON.stringify(player));
+                sessionStorage.setItem('ladodo_v4', JSON.stringify(player));
                 const code = new URLSearchParams(window.location.search).get('room');
                 if (code) { setRoomId(code); joinRoom(code); }
             }, []);
 
             useEffect(() => {
                 if (!roomId) return;
-                const roomRef = db.ref(`rooms/${roomId}`);
-                roomRef.on('value', (snap) => {
+                const ref = db.ref(`rooms/${roomId}`);
+                ref.on('value', (snap) => {
                     const val = snap.val();
                     if (val) {
                         if (val.phase === 'REVEALED' && gameState?.phase !== 'REVEALED') {
-                            val.lastAction?.success ? playSound('win') : playSound('lose');
-                            if (val.lastAction?.success) confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#fbbf24', '#ffffff'] });
+                            if (val.lastAction?.success) {
+                                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#22c55e', '#fbbf24'] });
+                                playSound(800, 'triangle', 0.5);
+                            } else {
+                                playSound(150, 'sawtooth', 0.5);
+                            }
                         }
                         setGameState(val);
                         if (val.currentBid) setLocalBid(val.currentBid);
                     }
                 });
-                return () => roomRef.off();
+                return () => ref.off();
             }, [roomId, gameState?.phase]);
 
             const createRoom = () => {
+                initAudio();
                 const code = Math.floor(1000 + Math.random() * 9000).toString();
                 db.ref(`rooms/${code}`).set({
                     roomId: code, hostId: player.id, phase: 'LOBBY', turnIndex: 0,
@@ -158,15 +155,14 @@
             };
 
             const joinRoom = (code = roomId) => {
+                initAudio();
                 db.ref(`rooms/${code}`).transaction((room) => {
                     if (room) {
                         if (!room.players[player.id]) {
-                            let startDice = 5;
-                            if (room.phase !== 'LOBBY') {
-                                const counts = Object.values(room.players).map(p => p.diceCount).filter(c => c > 0);
-                                startDice = counts.length > 0 ? Math.min(...counts) : 5;
-                            }
-                            room.players[player.id] = { ...player, diceCount: startDice, dice: [] };
+                            // מנגנון הגינות: מקבל את מספר הקוביות המינימלי בשולחן
+                            const counts = Object.values(room.players).map(p => p.diceCount).filter(c => c > 0);
+                            const minDice = counts.length > 0 ? Math.min(...counts) : 5;
+                            room.players[player.id] = { ...player, diceCount: minDice, dice: [] };
                             room.playerSequence.push(player.id);
                         }
                     }
@@ -177,22 +173,26 @@
 
             const startRound = () => {
                 setIsShaking(true);
-                playSound('shake');
+                playSound(200, 'square', 0.1);
                 setTimeout(() => {
-                    const newPlayers = { ...gameState.players };
+                    const updates = {};
                     gameState.playerSequence.forEach(pid => {
-                        if (newPlayers[pid].diceCount > 0) {
-                            newPlayers[pid].dice = Array.from({ length: newPlayers[pid].diceCount }, () => Math.floor(Math.random() * 6) + 1);
+                        const p = gameState.players[pid];
+                        if (p.diceCount > 0) {
+                            updates[`players/${pid}/dice`] = Array.from({ length: p.diceCount }, () => Math.floor(Math.random() * 6) + 1);
                         }
                     });
-                    db.ref(`rooms/${roomId}`).update({
-                        phase: 'PLAYING', players: newPlayers, currentBid: null, lastAction: null
-                    });
+                    updates['phase'] = 'PLAYING';
+                    updates['currentBid'] = null;
+                    updates['lastAction'] = null;
+                    db.ref(`rooms/${roomId}`).update(updates);
                     setIsShaking(false);
                 }, 1000);
             };
 
             const placeBid = () => {
+                initAudio();
+                playSound(600);
                 const nextTurn = (gameState.turnIndex + 1) % gameState.playerSequence.length;
                 db.ref(`rooms/${roomId}`).update({
                     currentBid: { ...localBid, playerId: player.id },
@@ -201,8 +201,9 @@
             };
 
             const callDudo = () => {
+                initAudio();
                 const bid = gameState.currentBid;
-                const allDice = Object.values(gameState.players).flatMap(p => p.dice);
+                const allDice = Object.values(gameState.players).flatMap(p => p.dice || []);
                 const count = allDice.filter(d => d === bid.value || (bid.value !== 1 && d === 1)).length;
                 const success = count < bid.quantity;
                 const loserId = success ? bid.playerId : player.id;
@@ -212,152 +213,118 @@
 
                 db.ref(`rooms/${roomId}`).update({
                     phase: 'REVEALED', players: newPlayers,
-                    lastAction: { success, loserId, winnerId: success ? player.id : bid.playerId, actualCount: count, bidWas: bid }
+                    lastAction: { success, loserId, actualCount: count, bidWas: bid }
                 });
             };
 
-            const shareGame = () => {
-                const url = window.location.origin + window.location.pathname + '?room=' + roomId;
+            const share = () => {
+                const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
                 navigator.clipboard.writeText(url);
-                alert('COPIED! 🎲');
+                playSound(1000, 'sine', 0.1);
             };
 
-            const lostDiceTotal = useMemo(() => {
-                if (!gameState) return 0;
-                return (gameState.playerSequence.length * 5) - Object.values(gameState.players).reduce((acc, p) => acc + p.diceCount, 0);
-            }, [gameState]);
-
-            if (!gameState) return (
-                <div className="h-screen flex flex-col items-center justify-center space-y-8 bg-[#022c22]">
-                    <div className="text-8xl animate-bounce">🎰</div>
-                    <button onClick={createRoom} className="w-64 bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-6 rounded-2xl text-3xl shadow-[0_10px_0_#b45309]">CREATE</button>
-                    <div className="flex bg-white/10 p-2 rounded-2xl">
-                        <input className="bg-transparent w-32 p-4 text-center text-2xl font-bold outline-none" placeholder="CODE" value={roomId} onChange={e => setRoomId(e.target.value)} />
-                        <button onClick={() => joinRoom()} className="bg-green-500 px-8 rounded-xl font-bold">JOIN</button>
-                    </div>
-                </div>
+            if (!gameState) return e('div', { className: 'h-screen flex flex-col items-center justify-center space-y-8 bg-[#022c22]' },
+                e('div', { className: 'text-8xl animate-bounce' }, '🎰'),
+                e('button', { onClick: createRoom, className: 'w-64 bg-yellow-500 text-black font-black py-6 rounded-2xl text-3xl btn-shadow border-b-8 border-yellow-700' }, 'יצירת חדר'),
+                e('div', { className: 'flex bg-white/10 p-2 rounded-2xl border border-white/20' },
+                    e('input', { className: 'bg-transparent w-32 p-4 text-center text-2xl font-bold outline-none', placeholder: 'קוד', value: roomId, onChange: e => setRoomId(e.target.value) }),
+                    e('button', { onClick: () => joinRoom(), className: 'bg-green-600 px-8 rounded-xl font-bold btn-shadow' }, 'כניסה')
+                )
             );
 
+            const me = gameState.players[player.id];
             const isMyTurn = gameState.phase === 'PLAYING' && gameState.playerSequence[gameState.turnIndex] === player.id;
+            const lostDiceCount = (gameState.playerSequence.length * 5) - Object.values(gameState.players).reduce((a, b) => a + b.diceCount, 0);
 
-            return (
-                <div className="h-screen flex flex-col overflow-hidden casino-felt">
-                    {/* Top Bar */}
-                    <div className="p-4 flex justify-between items-center bg-black/30">
-                        <button onClick={() => setIsEditMode(true)} className="text-3xl bg-yellow-500 p-2 rounded-full border-2 border-white">{player.avatar}</button>
-                        <div className="flex items-center space-x-3">
-                            <span className="text-yellow-500 font-bold text-xl">#{roomId}</span>
-                            <button onClick={shareGame} className="bg-blue-600 p-2 rounded-lg text-xl">📤</button>
-                        </div>
-                    </div>
+            return e('div', { className: 'h-screen flex flex-col overflow-hidden' },
+                // Header
+                e('div', { className: 'p-4 flex justify-between items-center bg-black/40 border-b border-white/10' },
+                    e('button', { onClick: () => setIsEditMode(true), className: 'text-3xl bg-yellow-500 w-12 h-12 flex items-center justify-center rounded-full border-2 border-white' }, player.avatar),
+                    e('div', { className: 'flex items-center gap-3' },
+                        e('span', { className: 'text-yellow-500 font-black text-xl' }, `#${roomId}`),
+                        e('button', { onClick: share, className: 'bg-blue-600 p-2 rounded-lg text-xl btn-shadow' }, '📤')
+                    )
+                ),
 
-                    {/* Opponents Circle */}
-                    <div className="flex justify-center flex-wrap gap-4 p-4">
-                        {gameState.playerSequence.map(pid => {
-                            const p = gameState.players[pid];
-                            const isTurn = gameState.phase === 'PLAYING' && gameState.playerSequence[gameState.turnIndex] === pid;
-                            const isLoser = gameState.phase === 'REVEALED' && gameState.lastAction?.loserId === pid;
-                            return (
-                                <div key={pid} className={`flex flex-col items-center p-3 rounded-2xl transition-all ${isTurn ? 'gold-glow bg-yellow-500/20 scale-110' : 'opacity-80'}`}>
-                                    <div className="text-3xl relative">
-                                        {p.avatar}
-                                        {isTurn && <div className="absolute -top-2 -right-2 text-xs bg-red-500 rounded-full px-1 animate-ping">●</div>}
-                                    </div>
-                                    <div className="text-[10px] uppercase font-bold text-white/50">{p.name}</div>
-                                    <div className="flex gap-0.5 mt-1">
-                                        {Array.from({ length: p.diceCount }).map((_, i) => <div key={i} className="w-2 h-2 bg-yellow-500 rounded-full" />)}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                // Players Circle
+                e('div', { className: 'flex justify-center flex-wrap gap-3 p-4' },
+                    gameState.playerSequence.map(pid => {
+                        const p = gameState.players[pid];
+                        const active = gameState.phase === 'PLAYING' && gameState.playerSequence[gameState.turnIndex] === pid;
+                        return e('div', { key: pid, className: `flex flex-col items-center p-2 rounded-xl transition-all ${active ? 'gold-glow bg-yellow-500/20 scale-110' : 'opacity-60'}` },
+                            e('div', { className: 'text-3xl' }, p.avatar),
+                            e('div', { className: 'flex gap-0.5 mt-1' }, Array.from({ length: p.diceCount }).map((_, i) => e('div', { key: i, className: 'w-2 h-2 bg-yellow-500 rounded-full' })))
+                        );
+                    })
+                ),
 
-                    {/* Table Center */}
-                    <div className="flex-1 relative flex flex-col items-center justify-center p-6">
-                        {/* Graveyard (Lost Dice Pile) */}
-                        <div className="absolute top-0 flex flex-wrap max-w-[200px] justify-center gap-1 opacity-20">
-                            {Array.from({ length: lostDiceTotal }).map((_, i) => <div key={i} className="w-4 h-4 bg-white rotate-12 rounded-sm" />)}
-                        </div>
+                // Table Area
+                e('div', { className: 'flex-1 relative flex flex-col items-center justify-center p-4' },
+                    // Dice Pile
+                    e('div', { className: 'absolute top-2 flex flex-wrap max-w-[180px] justify-center gap-1 opacity-20' },
+                        Array.from({ length: lostDiceCount }).map((_, i) => e('div', { key: i, className: 'w-4 h-4 bg-white rounded-sm rotate-12' }))
+                    ),
 
-                        {isShaking ? (
-                            <div className="text-9xl shake-cup">🥤</div>
-                        ) : gameState.phase === 'LOBBY' ? (
-                            <button onClick={startRound} className="bg-green-500 w-32 h-32 rounded-full text-5xl border-8 border-green-300 shadow-2xl">▶️</button>
-                        ) : gameState.phase === 'REVEALED' ? (
-                            <div className="w-full max-w-md bg-black/40 p-6 rounded-3xl border-2 border-white/20 text-center">
-                                <div className="flex flex-wrap justify-center gap-2 mb-8">
-                                    {Object.values(gameState.players).flatMap(p => p.dice).map((d, i) => (
-                                        <DiceIcon key={i} value={d} size={40} highlight={d === gameState.lastAction.bidWas.value || d === 1} />
-                                    ))}
-                                </div>
-                                <div className="text-6xl font-black mb-6 text-yellow-400">
-                                    {gameState.lastAction.actualCount} <span className="text-2xl">OF</span> <DiceIcon value={gameState.lastAction.bidWas.value} size={60} className="inline-block" />
-                                </div>
-                                <button onClick={startRound} className="bg-white text-black px-12 py-4 rounded-full text-2xl font-black shadow-xl">NEXT 🔄</button>
-                            </div>
-                        ) : (
-                            gameState.currentBid && (
-                                <div className="flex items-center space-x-6 bg-white/5 p-10 rounded-full border-4 border-yellow-500/30">
-                                    <span className="text-8xl font-black">{gameState.currentBid.quantity}</span>
-                                    <span className="text-4xl text-yellow-500">✕</span>
-                                    <DiceIcon value={gameState.currentBid.value} size={100} />
-                                </div>
+                    isShaking ? e('div', { className: 'text-9xl shake-cup' }, '🥤') :
+                    gameState.phase === 'LOBBY' ? e('button', { onClick: startRound, className: 'bg-green-500 w-32 h-32 rounded-full text-5xl border-8 border-green-300 shadow-2xl animate-pulse' }, '▶️') :
+                    gameState.phase === 'REVEALED' ? e('div', { className: 'w-full max-w-sm glass p-6 rounded-[2rem] text-center' },
+                        e('div', { className: 'flex flex-wrap justify-center gap-2 mb-6' },
+                            Object.values(gameState.players).flatMap(p => p.dice || []).map((d, i) => 
+                                e(DiceIcon, { key: i, value: d, size: 40, highlight: d === gameState.lastAction.bidWas.value || d === 1 })
                             )
-                        )}
-                    </div>
+                        ),
+                        e('div', { className: 'text-5xl font-black mb-6 text-yellow-400' }, 
+                            gameState.lastAction.actualCount, e('span', { className: 'text-xl mx-2' }, 'מתוך'), e(DiceIcon, { value: gameState.lastAction.bidWas.value, size: 50, className: 'inline-block' })
+                        ),
+                        e('button', { onClick: startRound, className: 'bg-white text-black px-12 py-4 rounded-full text-2xl font-black btn-shadow' }, 'המשך 🔄')
+                    ) :
+                    gameState.currentBid && e('div', { className: 'flex items-center gap-6 bg-white/5 p-8 rounded-full border-2 border-yellow-500/20' },
+                        e('span', { className: 'text-7xl font-black' }, gameState.currentBid.quantity),
+                        e('span', { className: 'text-3xl text-yellow-500' }, '✕'),
+                        e(DiceIcon, { value: gameState.currentBid.value, size: 80 })
+                    )
+                ),
 
-                    {/* Player Controls */}
-                    <div className="bg-black/40 p-6 rounded-t-[3rem] border-t-4 border-yellow-600/50">
-                        {/* My Dice */}
-                        <div className="flex justify-center gap-4 mb-6">
-                            {gameState.players[player.id]?.dice?.map((d, i) => (
-                                <div key={i} className="relative">
-                                    <DiceIcon value={d} size={55} />
-                                    {isShaking && <div className="absolute inset-0 bg-yellow-500 mix-blend-overlay animate-pulse rounded-lg"></div>}
-                                </div>
-                            ))}
-                        </div>
+                // Controls
+                e('div', { className: 'bg-black/50 p-6 rounded-t-[3rem] border-t border-white/10' },
+                    e('div', { className: 'flex justify-center gap-3 mb-6' },
+                        me?.dice?.map((d, i) => e(DiceIcon, { 
+                            key: i, value: d, size: 50, 
+                            className: (gameState.phase === 'REVEALED' && gameState.lastAction.loserId === player.id) ? 'losing-die-anim' : '' 
+                        }))
+                    ),
 
-                        {isMyTurn && (
-                            <div className="space-y-6">
-                                <div className="flex justify-around items-center">
-                                    <div className="flex items-center bg-black/50 rounded-2xl p-2 border border-white/20">
-                                        <button onClick={() => setLocalBid(b => ({...b, quantity: Math.max(1, b.quantity-1)}))} className="text-4xl px-4">➖</button>
-                                        <span className="text-4xl font-bold w-16 text-center">{localBid.quantity}</span>
-                                        <button onClick={() => setLocalBid(b => ({...b, quantity: b.quantity+1}))} className="text-4xl px-4">➕</button>
-                                    </div>
-                                    <div className="flex items-center bg-black/50 rounded-2xl p-2 border border-white/20">
-                                        <button onClick={() => setLocalBid(b => ({...b, value: b.value === 1 ? 6 : b.value-1}))} className="text-4xl px-4">◀️</button>
-                                        <DiceIcon value={localBid.value} size={50} />
-                                        <button onClick={() => setLocalBid(b => ({...b, value: b.value === 6 ? 1 : b.value+1}))} className="text-4xl px-4">▶️</button>
-                                    </div>
-                                </div>
-                                <div className="flex gap-4">
-                                    {gameState.currentBid && (
-                                        <button onClick={callDudo} className="flex-1 bg-red-600 py-5 rounded-2xl text-4xl shadow-[0_8px_0_#991b1b]">🤥</button>
-                                    )}
-                                    <button onClick={placeBid} className="flex-[2] bg-green-500 py-5 rounded-2xl text-4xl shadow-[0_8px_0_#166534]">🎲</button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    isMyTurn && e('div', { className: 'space-y-6' },
+                        e('div', { className: 'flex justify-around' },
+                            e('div', { className: 'flex items-center bg-black/40 rounded-2xl p-1 border border-white/10' },
+                                e('button', { onClick: () => setLocalBid(b => ({...b, quantity: Math.max(1, b.quantity-1)})), className: 'text-4xl px-4' }, '➖'),
+                                e('span', { className: 'text-4xl font-black w-12 text-center' }, localBid.quantity),
+                                e('button', { onClick: () => setLocalBid(b => ({...b, quantity: b.quantity+1})), className: 'text-4xl px-4' }, '➕')
+                            ),
+                            e('div', { className: 'flex items-center bg-black/40 rounded-2xl p-1 border border-white/10' },
+                                e('button', { onClick: () => setLocalBid(b => ({...b, value: b.value === 1 ? 6 : b.value-1})), className: 'text-3xl px-3' }, '◀️'),
+                                e(DiceIcon, { value: localBid.value, size: 50 }),
+                                e('button', { onClick: () => setLocalBid(b => ({...b, value: b.value === 6 ? 1 : b.value+1})), className: 'text-3xl px-3' }, '▶️')
+                            )
+                        ),
+                        e('div', { className: 'flex gap-4' },
+                            gameState.currentBid && e('button', { onClick: callDudo, className: 'flex-1 bg-red-600 py-5 rounded-2xl text-4xl btn-shadow border-b-8 border-red-800' }, '🤥'),
+                            e('button', { onClick: placeBid, className: 'flex-[2] bg-green-500 py-5 rounded-2xl text-4xl btn-shadow border-b-8 border-green-800' }, '🎲')
+                        )
+                    )
+                ),
 
-                    {/* Profile Editor Modal */}
-                    {isEditMode && (
-                        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-6">
-                            <div className="text-8xl mb-8">{player.avatar}</div>
-                            <input className="bg-slate-800 text-white text-3xl p-4 rounded-xl mb-8 text-center" value={player.name} onChange={e => setPlayer({...player, name: e.target.value.slice(0,8)})} />
-                            <div className="grid grid-cols-5 gap-4 mb-12">
-                                {AVATARS.map(a => <button key={a} onClick={() => setPlayer({...player, avatar: a})} className="text-4xl p-2">{a}</button>)}
-                            </div>
-                            <button onClick={() => { setIsEditMode(false); joinRoom(); }} className="bg-green-500 px-12 py-4 rounded-full text-2xl font-bold">SAVE</button>
-                        </div>
-                    )}
-                </div>
+                // Edit Profile Modal
+                isEditMode && e('div', { className: 'fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-8' },
+                    e('div', { className: 'text-9xl mb-8' }, player.avatar),
+                    e('input', { className: 'bg-white/10 text-white text-3xl p-4 rounded-xl mb-8 text-center border-2 border-yellow-500', value: player.name, onChange: e => setPlayer({...player, name: e.target.value.slice(0,10)}) }),
+                    e('div', { className: 'grid grid-cols-5 gap-4 mb-12' }, AVATARS.map(a => e('button', { key: a, onClick: () => setPlayer({...player, avatar: a}), className: 'text-4xl' }, a))),
+                    e('button', { onClick: () => { setIsEditMode(false); db.ref(`rooms/${roomId}/players/${player.id}`).update(player); }, className: 'bg-green-600 px-12 py-4 rounded-full text-2xl font-bold' }, 'שמור ✅')
+                )
             );
         };
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        ReactDOM.render(e(App), document.getElementById('root'));
     </script>
 </body>
 </html>
