@@ -73,6 +73,23 @@ html, body {
   65%{transform:scale(1.1) rotate(4deg);opacity:1}
   100%{transform:scale(1) rotate(var(--pr,0deg));opacity:1}
 }
+/* Cup shake for round start animation */
+@keyframes cup-wiggle {
+  0%,100% { transform: translateY(0) rotate(0deg); }
+  15%  { transform: translateY(-8px) rotate(-5deg); }
+  30%  { transform: translateY(-12px) rotate(5deg); }
+  45%  { transform: translateY(-8px) rotate(-3deg); }
+  60%  { transform: translateY(-10px) rotate(3deg); }
+  75%  { transform: translateY(-6px) rotate(-2deg); }
+  90%  { transform: translateY(-3px) rotate(2deg); }
+}
+@keyframes dice-tumble {
+  0%   { transform: rotate(0deg) scale(1); opacity:.7; }
+  25%  { transform: rotate(90deg) scale(1.1); opacity:1; }
+  50%  { transform: rotate(180deg) scale(.9); opacity:.8; }
+  75%  { transform: rotate(270deg) scale(1.05); opacity:1; }
+  100% { transform: rotate(360deg) scale(1); opacity:.7; }
+}
 /* flying die: pure CSS from loser card toward bottom-right (pile is bottom-right corner) */
 @keyframes fly-die {
   0%  {transform:translate(0,0) scale(1) rotate(0deg);opacity:1}
@@ -317,6 +334,47 @@ const BidCenter = ({ bid, players }) => {
 };
 
 // ══════════════════════════════════════
+// CUP SHAKE ANIMATION (round start)
+// ══════════════════════════════════════
+const CupShakeAnim = ({ onDone }) => {
+  useEffect(() => {
+    const t = setTimeout(onDone, 1200);
+    return () => clearTimeout(t);
+  }, []);
+
+  return React.createElement('div', {
+    style:{
+      position:'fixed', inset:0, zIndex:150,
+      background:'rgba(0,0,0,.75)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      animation:'pop-in .2s ease'
+    }
+  },
+    React.createElement('div', {
+      style:{
+        position:'relative', display:'flex', flexDirection:'column',
+        alignItems:'center', gap:12
+      }
+    },
+      // Cup
+      React.createElement('div', {
+        style:{ fontSize:'6rem', lineHeight:1, animation:'cup-wiggle .8s ease-in-out infinite' }
+      }, '🥤'),
+      // Dice tumbling inside
+      React.createElement('div', {
+        style:{ display:'flex', gap:8, position:'absolute', top:'50%', left:'50%',
+          transform:'translate(-50%, -50%)' }
+      },
+        [1,2,3].map(i => React.createElement(DiceSVG, {
+          key:i, val:1+(i%6), size:28,
+          extraStyle:{ animation:`dice-tumble ${.4 + i*.1}s linear infinite` }
+        }))
+      )
+    )
+  );
+};
+
+// ══════════════════════════════════════
 // FLYING DIE (DOM portal for animation)
 // ══════════════════════════════════════
 const FlyingDie = ({ fromEl, onDone }) => {
@@ -357,23 +415,39 @@ const ResultScreen = ({ gs, myId, onNext }) => {
   const caller = gs.players[la.caller];
   const bidder = gs.players[la.bidder];
   const loser  = gs.players[la.loserId];
+  const winner = callerWon ? caller : bidder;
   const bidVal = la.bidWas?.value;
   const isMe   = myId===la.caller;
+  const isBidder = myId===la.bidder;
   const iLost  = myId===la.loserId;
+  const iWon   = myId===winner.id;
+
+  // Flash & confetti for winner
+  useEffect(() => {
+    if (iWon) {
+      confetti({ particleCount:120, spread:70, origin:{y:.6}, colors:['#2ecc71','#00e676','#a8ffcc'] });
+      setTimeout(()=>confetti({ particleCount:60, spread:100, origin:{x:.2,y:.4} }), 300);
+      setTimeout(()=>confetti({ particleCount:60, spread:100, origin:{x:.8,y:.4} }), 500);
+    }
+  }, [iWon]);
 
   const allDice = gs.playerSequence.map(pid=>({pid,p:gs.players[pid],dice:gs.players[pid]?.dice||[]})).filter(x=>x.dice.length>0);
 
-  return React.createElement('div', { className:'result-overlay' },
+  // Color: green for winner, red for loser
+  const borderColor = iWon ? '#2ecc71' : (iLost ? '#e84040' : (callerWon ? '#2ecc71' : '#e84040'));
+  const bgColor = iWon ? 'rgba(18,70,35,.92)' : (iLost ? 'rgba(70,10,10,.92)' : (callerWon ? 'rgba(18,70,35,.92)' : 'rgba(70,10,10,.92)'));
+
+  return React.createElement('div', { className:'result-overlay', style:{ animation: iWon ? 'flash-green .6s ease' : (iLost ? 'flash-red .6s ease' : 'none') } },
     showFlying && !flyDone && loserCardRef.current &&
       React.createElement(FlyingDie, { fromEl:loserCardRef.current, onDone:()=>setFlyDone(true) }),
 
     // Result card
     React.createElement('div', {
       style:{width:'100%',maxWidth:360,borderRadius:20,
-        border:`3px solid ${callerWon?'#2ecc71':'#e84040'}`,
-        background:callerWon?'rgba(18,70,35,.92)':'rgba(70,10,10,.92)',
+        border:`3px solid ${borderColor}`,
+        background:bgColor,
         padding:'13px 16px',textAlign:'center',
-        boxShadow:`0 0 24px ${callerWon?'rgba(46,204,113,.4)':'rgba(232,64,64,.4)'}`,
+        boxShadow:`0 0 24px ${iWon?'rgba(46,204,113,.5)':'rgba(232,64,64,.4)'}`,
         animation:'reveal-in .4s cubic-bezier(.3,.7,.4,1) both'}},
 
       // Caller vs bidder
@@ -383,9 +457,15 @@ const ResultScreen = ({ gs, myId, onNext }) => {
         React.createElement('div',{style:{fontSize:34,animation:!callerWon?'bounce-avatar .7s ease':'lose-shake .5s ease'}},bidder?.avatar)
       ),
 
-      // Emoji result
-      React.createElement('div',{style:{fontSize:'1.8rem',marginBottom:8}},
-        callerWon ? (isMe?'🎉':'✅') : (iLost?'💀':'❌')),
+      // Emoji result — personalized
+      React.createElement('div',{style:{fontSize:'2rem',marginBottom:8}},
+        iWon ? '🎉🏆🎉' : (iLost ? '💀❌💀' : (callerWon ? '✅' : '❌'))),
+
+      // Clear message: who won, who lost
+      React.createElement('div',{style:{fontSize:'.95rem',color:iWon?'#2ecc71':(iLost?'#e84040':'rgba(255,255,255,.7)'),marginBottom:8,fontWeight:'bold'}},
+        iWon ? '🎊' : (iLost ? '' : ''),
+        ' ', winner?.avatar, ' ', winner?.name
+      ),
 
       // Count vs bid
       React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginBottom:6}},
@@ -395,9 +475,9 @@ const ResultScreen = ({ gs, myId, onNext }) => {
         React.createElement('span',{style:{opacity:.4,fontSize:'.95rem'}},' / '+la.bidWas?.quantity)
       ),
 
-      // Who loses
+      // Who loses die
       React.createElement('div', { ref:loserCardRef,
-        style:{fontSize:'.85rem',color:'#e84040',display:'flex',alignItems:'center',justifyContent:'center',gap:5}},
+        style:{fontSize:'.85rem',color:'#e84040',display:'flex',alignItems:'center',justifyContent:'center',gap:5,marginTop:4}},
         loser?.avatar,' ',loser?.name,' −1 🎲')
     ),
 
@@ -431,7 +511,12 @@ const PublicRoomsList = ({ myId, onJoin }) => {
     const ref = db.ref('publicRooms');
     ref.on('value', snap => {
       const val = snap.val() || {};
-      const list = Object.values(val).filter(r => r && r.phase !== 'DONE');
+      // Filter: must have players, not WON or DONE
+      const list = Object.values(val).filter(r => {
+        if (!r || r.phase === 'DONE' || r.phase === 'WON') return false;
+        const playerCount = Object.keys(r.players || {}).length;
+        return playerCount > 0;
+      });
       setRooms(list);
     });
     return () => ref.off();
@@ -473,17 +558,30 @@ const App = () => {
   const [pileFlash, setPileFlash] = useState(false);
   const [notif, setNotif]         = useState(null);
   const [isPublic, setIsPublic]   = useState(false); // lobby choice
+  const [cupShaking, setCupShaking] = useState(false); // round start anim
   const prevPhase = useRef(null);
   const prevPile  = useRef(0);
 
-  // Persist
+  // Persist + presence tracking
   useEffect(() => {
     sessionStorage.setItem('dudo_p', JSON.stringify(player));
     if (roomId) {
       db.ref(`rooms/${roomId}/players/${player.id}/name`).set(player.name);
       db.ref(`rooms/${roomId}/players/${player.id}/avatar`).set(player.avatar);
+      // Set presence marker
+      const presenceRef = db.ref(`rooms/${roomId}/players/${player.id}/online`);
+      presenceRef.set(true);
+      presenceRef.onDisconnect().remove();
+      
+      // If public, sync to publicRooms and cleanup on disconnect
+      if (gs?.isPublic) {
+        db.ref(`publicRooms/${roomId}/players/${player.id}`).set({avatar:player.avatar,name:player.name});
+        db.ref(`publicRooms/${roomId}/players/${player.id}`).onDisconnect().remove();
+        // Also remove entire public room if this was last player
+        db.ref(`publicRooms/${roomId}`).onDisconnect().remove();
+      }
     }
-  }, [player]);
+  }, [player, roomId, gs?.isPublic]);
 
   // Auto-join from URL
   useEffect(() => {
@@ -501,11 +599,23 @@ const App = () => {
       const prev = prevPhase.current;
       if (val.phase==='REVEALED' && prev!=='REVEALED') { SFX.reveal(); setShowResult(true); }
       if (val.phase==='PLAYING' && prev==='REVEALED') {
-        setShowResult(false); SFX.shake();
+        setShowResult(false);
+        setCupShaking(true); // Show cup shake
+        SFX.shake();
         const np = val.tableDice||0;
         if (np > (prevPile.current||0)) { setPileFlash(true); setTimeout(()=>setPileFlash(false),900); }
         prevPile.current = np;
+        // Reset bid to 1×2 when new round starts
         setBid({qty:1,val:2});
+      }
+      // Also trigger cup shake when starting first round from LOBBY
+      if (val.phase==='PLAYING' && prev==='LOBBY') {
+        setCupShaking(true);
+        SFX.shake();
+      }
+      if (val.phase==='PLAYING' && prev==='PLAYING' && val.currentBid) {
+        // When a bid is placed, update local bid to match current board bid
+        setBid({qty:val.currentBid.quantity, val:val.currentBid.value});
       }
       if (val.phase==='WON' && prev!=='WON') {
         SFX.win();
@@ -733,6 +843,9 @@ const App = () => {
     style:{width:'100%',height:'100%',height:'100dvh',display:'flex',flexDirection:'column',overflow:'hidden',position:'relative',zIndex:1}
   },
 
+    // Cup shake animation overlay
+    cupShaking && React.createElement(CupShakeAnim, { onDone:()=>setCupShaking(false) }),
+
     // Result overlay
     showResult && gs.phase==='REVEALED' && gs.lastAction &&
       React.createElement(ResultScreen,{gs,myId:player.id,onNext:doNextRound}),
@@ -759,8 +872,6 @@ const App = () => {
           style:{padding:'4px 9px',fontSize:'.78rem',borderRadius:9,border:'1px solid rgba(255,255,255,.15)'},
           onClick:doShare},copied?'✅':'🔗')
       ),
-      // total dice left
-      React.createElement('div',{style:{fontSize:'.85rem',color:'rgba(245,200,66,.6)'}},'🎲×'+totalDice),
       // my card
       me && React.createElement(PlayerCard,{
         p:{...me,name:player.name,avatar:player.avatar},
